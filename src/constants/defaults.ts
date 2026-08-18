@@ -1,0 +1,30 @@
+/**
+ * Protocol Defaults and Network Configuration Constants.
+ */
+
+export const ProtocolDefaults = {
+  // Protocol Version
+  PROTOCOL_VERSION: 1,
+
+  // Network & WebSocket Endpoints
+  DEFAULT_PORT: 8080,
+  DEFAULT_WS_PATH: '/ws',
+  DEFAULT_BRAIN_URL: 'ws://localhost:8080/ws',
+  DEFAULT_DEV_TOKEN: 'mio-dev-secret-token',
+  DEFAULT_FAKE_HEART_ID: 'heart-sim-01',
+
+  // Reconnection Backoff Configuration
+  RECONNECT_INITIAL_DELAY_MS: 1000,
+  RECONNECT_MAX_DELAY_MS: 10000,
+  RECONNECT_BACKOFF_MULTIPLIER: 1.5,
+
+  // Command & Request Timeouts
+  DEFAULT_COMMAND_TIMEOUT_MS: 5000,
+  DEFAULT_APPROVAL_TIMEOUT_MS: 60000,
+
+  // ULID Configuration
+  ULID_TIME_LEN: 10,
+  ULID_RANDOM_LEN: 16,
+  ULID_TOTAL_LEN: 26,
+  CROCKFORD_BASE32_ALPHABET: '0123456789ABCDEFGHJKMNPQRSTVWXYZ',
+} as const;
