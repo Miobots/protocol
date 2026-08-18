@@ -1,2 +1,9 @@
-// Entry point. Scaffold only — see CLAUDE.md for the first real task.
-console.log("miobots-protocol — scaffold running. Nothing implemented yet.");
+/**
+ * @miobots/protocol
+ * Universal message envelope, wire codecs, topic registry, constants, and canonical simulator.
+ */
+
+export * from './constants/index.ts';
+export * from './envelope/index.ts';
+export * from './codec/index.ts';
+export * from './topics/index.ts';
