@@ -1,0 +1,22 @@
+{
+  "description": "Valid diagnostic fault event with structured recovery hint",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6B9",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6B9",
+    "t_mono_ns": "179900000000",
+    "t_wall_ms": 1786398000000,
+    "kind": "EVT",
+    "topic": "diag.fault",
+    "seq": 338,
+    "payload": {
+      "subsystem": "encoder_left",
+      "code": "ENCODER_LEFT_NO_DATA",
+      "severity": "error",
+      "recovery_hint": "check_cable",
+      "pose": [2.1, 0.4, 0.0]
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

@@ -3,7 +3,7 @@
  * Governs the 10-field envelope format across Brain, Heart, Synapse, and Ganglion.
  */
 
-import { Kind, ProtocolErrorCode, type ExecutionStatus } from '../constants/index.ts';
+import { Kind, ProtocolErrorCode, ProtocolErrorReason, type ExecutionStatus } from '../constants/index.ts';
 
 export { Kind };
 
@@ -61,18 +61,41 @@ export interface AckPayload {
   details?: Record<string, unknown>;
 }
 
+export interface ProtocolErrorOptions {
+  reason?: string;
+  field?: string;
+  details?: unknown;
+}
+
 /**
  * Protocol framing or validation error.
  */
 export class ProtocolError extends Error {
   public readonly code: string;
+  public readonly reason: string;
+  public readonly field?: string;
   public readonly details?: unknown;
 
-  constructor(message: string, code: string = ProtocolErrorCode.ERR_PROTOCOL, details?: unknown) {
+  constructor(
+    message: string,
+    code: string = ProtocolErrorCode.ERR_PROTOCOL,
+    options?: ProtocolErrorOptions | unknown
+  ) {
     super(message);
     this.name = 'ProtocolError';
     this.code = code;
-    this.details = details;
+
+    if (options && typeof options === 'object' && ('reason' in options || 'field' in options || 'details' in options)) {
+      const opts = options as ProtocolErrorOptions;
+      this.reason = opts.reason ?? ProtocolErrorReason.INVALID_ENVELOPE;
+      this.field = opts.field;
+      this.details = opts.details;
+    } else {
+      this.reason = ProtocolErrorReason.INVALID_ENVELOPE;
+      this.details = options;
+    }
+
     Object.setPrototypeOf(this, ProtocolError.prototype);
   }
 }
+

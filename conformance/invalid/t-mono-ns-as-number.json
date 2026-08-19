@@ -1,0 +1,21 @@
+{
+  "description": "t_mono_ns sent as a number instead of string",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6W7",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6W7",
+    "t_mono_ns": 184023991000,
+    "t_wall_ms": 1786412400123,
+    "kind": "EVT",
+    "topic": "sys.heartbeat",
+    "seq": 1,
+    "payload": {
+      "status": "ok",
+      "t_wall_ms": 1786412400123
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "invalid_envelope",
+    "field": "t_mono_ns"
+  }
+}

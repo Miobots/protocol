@@ -59,7 +59,9 @@ export function newEnvelope<TTopic extends string, TPayload>(
     payload: options.payload,
   };
 
-  if (options.idem_key !== undefined) {
+  if (options.kind === Kind.CMD) {
+    envelope.idem_key = options.idem_key ?? generateUlid();
+  } else if (options.idem_key !== undefined) {
     envelope.idem_key = options.idem_key;
   }
 
