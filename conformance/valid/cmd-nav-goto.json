@@ -1,0 +1,24 @@
+{
+  "description": "Valid navigation goto command with idem_key, expires_at, and goal payload",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6A1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6C7",
+    "t_mono_ns": "184023991000",
+    "t_wall_ms": 1786412400123,
+    "kind": "CMD",
+    "topic": "nav.goto",
+    "seq": 412,
+    "idem_key": "nav-01J6G7M8N9P0Q1R2S3T4U5V6C7",
+    "expires_at": 1786412460123,
+    "payload": {
+      "x": 3.2,
+      "y": -1.1,
+      "yaw": 1.57,
+      "region": "kitchen",
+      "goal_id": "g-88"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

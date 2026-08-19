@@ -1,0 +1,20 @@
+{
+  "description": "Valid sys.welcome handshake ACK from Brain to client",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6W1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6H1",
+    "t_mono_ns": "105000000",
+    "t_wall_ms": 1786412400050,
+    "kind": "ACK",
+    "topic": "sys.welcome",
+    "seq": 1,
+    "payload": {
+      "accepted": true,
+      "session_id": "sess-998877",
+      "server_wall_ms": 1786412400050
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

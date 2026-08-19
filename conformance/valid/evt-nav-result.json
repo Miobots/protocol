@@ -1,0 +1,24 @@
+{
+  "description": "Valid nav.result terminal event indicating successful goal completion",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6R1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6C7",
+    "t_mono_ns": "184033000000",
+    "t_wall_ms": 1786412409000,
+    "kind": "EVT",
+    "topic": "nav.result",
+    "seq": 415,
+    "payload": {
+      "success": true,
+      "total_time_s": 8.879,
+      "final_pose": {
+        "x": 3.19,
+        "y": -1.08,
+        "yaw": 1.56
+      }
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

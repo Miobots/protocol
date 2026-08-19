@@ -1,0 +1,28 @@
+{
+  "description": "Valid sys.hello handshake command from Heart to Brain",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6H1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6H1",
+    "t_mono_ns": "100000000",
+    "t_wall_ms": 1786412400000,
+    "kind": "CMD",
+    "topic": "sys.hello",
+    "seq": 1,
+    "idem_key": "hello-heart-sim-01",
+    "payload": {
+      "device_id": "heart-sim-01",
+      "token": "mio-dev-secret-token",
+      "protocol_version": 1,
+      "role": "heart",
+      "client_wall_ms": 1786412400000,
+      "capabilities": [
+        "voice.speak",
+        "nav.goto",
+        "state.pose"
+      ]
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

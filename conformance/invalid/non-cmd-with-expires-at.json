@@ -1,0 +1,22 @@
+{
+  "description": "Non-CMD message (TELEM) carrying expires_at",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6W7",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6W7",
+    "t_mono_ns": "184023991000",
+    "t_wall_ms": 1786412400123,
+    "kind": "TELEM",
+    "topic": "state.pose",
+    "seq": 1,
+    "expires_at": 1786412460123,
+    "payload": {
+      "x": 1.0,
+      "y": 2.0
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "invalid_envelope",
+    "field": "expires_at"
+  }
+}

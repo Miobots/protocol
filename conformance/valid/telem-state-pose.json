@@ -1,0 +1,21 @@
+{
+  "description": "Valid state.pose telemetry envelope",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6P1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6P1",
+    "t_mono_ns": "184024000000",
+    "t_wall_ms": 1786412400200,
+    "kind": "TELEM",
+    "topic": "state.pose",
+    "seq": 1001,
+    "payload": {
+      "x": 1.45,
+      "y": -0.82,
+      "yaw": 0.78,
+      "confidence": 0.98
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}
