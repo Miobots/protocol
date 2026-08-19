@@ -12,6 +12,7 @@ Shared across `miobots-brain`, `miobots-heart`, `miobots-synapse`, and `miobots-
 - **Isolated Codec:** JSON wire serialization (`encode`, `decode`, `parse`) cleanly decoupled from domain logic.
 - **Canonical Fake Heart (`src/fake-heart.ts`):** Standalone robot simulator that dials out to Brain over WebSocket, authenticates, and handles speech actions with real-time ACKs.
 - **Zero-Dependency ULID Generator:** Monotonically sortable 26-char Crockford Base32 IDs.
+- **Cross-Language Conformance Vectors (`conformance/`):** 31 canonical test vectors enforcing wire protocol parity between TypeScript and Rust.
 
 ---
 

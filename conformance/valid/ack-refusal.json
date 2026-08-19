@@ -1,0 +1,24 @@
+{
+  "description": "Valid ACK envelope refusing a goal due to low battery",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6A3",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6C7",
+    "t_mono_ns": "184024102000",
+    "t_wall_ms": 1786412400241,
+    "kind": "ACK",
+    "topic": "nav.goto",
+    "seq": 902,
+    "payload": {
+      "accepted": false,
+      "reason": "battery_below_return_margin",
+      "exec_status": "rejected",
+      "details": {
+        "battery_pct": 16,
+        "threshold": 25
+      }
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}
