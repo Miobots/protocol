@@ -1,0 +1,20 @@
+{
+  "description": "Valid ACK envelope accepting a navigation command",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6A2",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6C7",
+    "t_mono_ns": "184024102000",
+    "t_wall_ms": 1786412400241,
+    "kind": "ACK",
+    "topic": "nav.goto",
+    "seq": 901,
+    "payload": {
+      "accepted": true,
+      "exec_status": "executing",
+      "goal_id": "g-88"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

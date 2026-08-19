@@ -1,0 +1,20 @@
+{
+  "description": "Valid state.battery telemetry envelope",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6P2",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6P2",
+    "t_mono_ns": "184024005000",
+    "t_wall_ms": 1786412400205,
+    "kind": "TELEM",
+    "topic": "state.battery",
+    "seq": 1002,
+    "payload": {
+      "percentage": 76.5,
+      "voltage": 15.2,
+      "is_charging": false
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

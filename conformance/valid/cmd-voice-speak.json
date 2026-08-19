@@ -1,0 +1,21 @@
+{
+  "description": "Valid voice speak command with Urdu text payload and idempotency key",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V6B2",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V6B2",
+    "t_mono_ns": "184023995000",
+    "t_wall_ms": 1786412400150,
+    "kind": "CMD",
+    "topic": "voice.speak",
+    "seq": 413,
+    "idem_key": "voice-01J6G7M8N9P0Q1R2S3T4U5V6B2",
+    "payload": {
+      "text": "Salam, aap kaisay hain?",
+      "lang": "ur",
+      "priority": "urgent"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

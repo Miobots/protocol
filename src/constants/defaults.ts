@@ -22,6 +22,10 @@ export const ProtocolDefaults = {
   DEFAULT_COMMAND_TIMEOUT_MS: 5000,
   DEFAULT_APPROVAL_TIMEOUT_MS: 60000,
 
+  // Payload & Message Size Constraints (64 KB)
+  MAX_PAYLOAD_BYTES: 65536,
+  MAX_MESSAGE_BYTES: 65536,
+
   // ULID Configuration
   ULID_TIME_LEN: 10,
   ULID_RANDOM_LEN: 16,

@@ -4,6 +4,30 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-08-19 05:30 PKT — P0.6: Cross-Language Conformance Vectors & Strict Parity Validation
+
+### Summary Description
+
+Implemented the shared protocol conformance test suite mandated by **HEART_DECISIONS #33** and **ENVELOPE.md §11**. Establishes 31 canonical test vectors across `conformance/valid/` (15 envelopes) and `conformance/invalid/` (16 envelopes and wire payloads) designed for cross-language validation between TypeScript (`miobots-protocol`, `miobots-brain`) and Rust (`mio_gateway`).
+
+Enhanced the runtime JSON codec and envelope factory with strict invariant validation, including requiring `idem_key` on `CMD` envelopes, rejecting non-CMD envelopes carrying `idem_key` or `expires_at`, catching expired commands (`expires_at < t_wall_ms`), enforcing stringified decimal digits on `t_mono_ns`, and capping payload/message wire sizes at 64 KB (`ProtocolDefaults.MAX_PAYLOAD_BYTES`). Added dynamic vector testing in `tests/conformance.test.ts` running under Bun and Node.
+
+### Added
+
+- **`conformance/README.md`:** Two-line rule establishing that adding a field means adding a vector.
+- **`conformance/valid/`:** 15 canonical valid envelopes covering commands (`nav.goto`, `voice.speak`, `sys.hello`), acknowledgements (`sys.welcome`, acceptances, refusal with reason), events (`sys.heartbeat`, `diag.fault`, `nav.feedback`, `nav.result`), telemetry (`state.pose`, `state.battery`), and queries/replies (`cap.manifest`).
+- **`conformance/invalid/`:** 16 canonical rejection vectors covering missing fields (`topic`, `msg_id`, `corr_id`), empty/unknown `kind` (`BANANA`), missing or empty `idem_key` on `CMD`, non-CMD with `idem_key` or `expires_at`, number or malformed `t_mono_ns`, expired commands, oversized payloads (>64 KB), negative sequence numbers, and malformed wire JSON syntax.
+- **`tests/conformance.test.ts`:** Automated test suite dynamically loading and validating all conformance vectors.
+- **`src/constants/errors.ts`:** Added `ProtocolErrorReason` constants (`invalid_envelope`, `unknown_kind`, `unknown_topic`, `malformed`, `expired`, `oversized_payload`) and error codes `ERR_EXPIRED` and `ERR_PAYLOAD_TOO_LARGE`.
+- **`src/constants/defaults.ts`:** Added `MAX_PAYLOAD_BYTES` and `MAX_MESSAGE_BYTES` (64 KB).
+
+### Changed
+
+- **`src/envelope/types.ts`:** Enhanced `ProtocolError` with `reason` and `field` properties.
+- **`src/envelope/envelope.ts`:** `newEnvelope()` automatically populates a default `idem_key` when `kind === Kind.CMD` if omitted.
+- **`src/codec/json.ts`:** Enforced strict wire validation, size limits, and machine-readable error reasons.
+
+
 ## 2026-08-16 06:00 PKT — Centralized Constants & Configuration Module
 
 ### Summary Description
