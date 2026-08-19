@@ -4,6 +4,7 @@
 
 import { generateUlid } from './ulid.ts';
 import { Kind, type AckPayload, type Envelope } from './types.ts';
+import { SequenceCounter } from './sequence.ts';
 
 let globalSequenceCounter = 0;
 
@@ -31,7 +32,7 @@ export interface NewEnvelopeOptions<TTopic extends string, TPayload> {
   msg_id?: string;
   idem_key?: string;
   expires_at?: number;
-  seq?: number;
+  seq?: number | SequenceCounter;
   t_wall_ms?: number;
   t_mono_ns?: string;
 }
@@ -46,7 +47,12 @@ export function newEnvelope<TTopic extends string, TPayload>(
   const corr_id = options.corr_id ?? msg_id;
   const t_wall_ms = options.t_wall_ms ?? Date.now();
   const t_mono_ns = options.t_mono_ns ?? getMonotonicNs();
-  const seq = options.seq ?? getNextSequence();
+  const seq =
+    options.seq instanceof SequenceCounter
+      ? options.seq.next()
+      : typeof options.seq === 'number'
+      ? options.seq
+      : getNextSequence();
 
   const envelope: Envelope<TTopic, TPayload> = {
     msg_id,
