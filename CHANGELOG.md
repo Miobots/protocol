@@ -4,6 +4,29 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-08-19 05:40 PKT — P0.7: Closing the Four Spec Gaps (Version Handshake, Heartbeat Watchdog, Jitter & Sequence Counters)
+
+### Summary Description
+
+Closed all four architectural and behavioural gaps between `ENVELOPE.md` (§6, §8) and the runtime protocol implementation:
+1. **Protocol Version Handshake Refusal:** Added `validateHello()` and `createWelcomeAck()` in `src/topics/sys.ts`. Protocol version mismatches are explicitly rejected with `reason: "protocol_version_mismatch"` and `sys.welcome { accepted: false }`, with `fake-heart.ts` closing rejected connections immediately.
+2. **Bidirectional Heartbeat & Dead-Link Detection:** Configured `fake-heart.ts` to actively emit `sys.heartbeat` every 5 seconds (`ProtocolDefaults.HEARTBEAT_INTERVAL_MS`) and implemented a watchdog that declares dead links and terminates sockets if 3 consecutive heartbeats (>15 s, `ProtocolDefaults.HEARTBEAT_TIMEOUT_MS`) are missed from Brain.
+3. **Reconnection Jitter:** Implemented `calculateBackoffWithJitter()` applying a randomized factor ($0.5 \times \text{delay}$ to $1.5 \times \text{delay}$) to prevent thundering-herd reconnect spikes.
+4. **Per-Connection Monotonic Sequence Counters & Gap Detectors:** Replaced global shared sequence state with isolated `SequenceCounter` instances and a `SequenceGapDetector` module (`src/envelope/sequence.ts`). Supported `SequenceCounter` integration in `newEnvelope()`, ensuring multi-connection environments maintain per-connection sequence isolation and discard stale telemetry.
+
+### Added
+
+- **`src/envelope/sequence.ts`:** `SequenceCounter`, `createSequenceCounter()`, and `SequenceGapDetector` for per-connection sequence isolation and stale telemetry pruning.
+- **`src/topics/sys.ts`:** `validateHello()` and `createWelcomeAck()` helpers for strict handshake negotiation.
+- **`tests/gaps.test.ts`:** Automated test suite validating version handshake refusal, heartbeat parameters, jittered backoffs, and isolated sequence tracking.
+- **`src/constants/defaults.ts`:** Added `HEARTBEAT_INTERVAL_MS` (5000), `HEARTBEAT_MISSED_THRESHOLD` (3), `HEARTBEAT_TIMEOUT_MS` (15000), `RECONNECT_JITTER_MIN_FACTOR` (0.5), and `RECONNECT_JITTER_MAX_FACTOR` (1.5).
+
+### Changed
+
+- **`src/envelope/envelope.ts`:** Updated `newEnvelope()` to accept `SequenceCounter` instances in `options.seq`.
+- **`src/simulator/fake-heart.ts`:** Integrated per-connection `SequenceCounter`, bidirectional 5s heartbeats with 3-miss dead-link watchdog, version rejection handling, and jittered reconnection backoff.
+
+
 ## 2026-08-19 05:30 PKT — P0.6: Cross-Language Conformance Vectors & Strict Parity Validation
 
 ### Summary Description
