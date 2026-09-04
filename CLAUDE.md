@@ -51,26 +51,27 @@ Later it becomes the CI fixture rather than being thrown away.
 
 ---
 
-## Run
+## Run (with Bun)
 
 ```bash
-npm install
-npm start        # Node 26 runs TypeScript directly — there is no build step
-npm test         # node --test
-npm run typecheck
+bun install
+bun test         # Runs full unit and cross-language conformance test suites
+bun run typecheck
+bun run sim      # Starts the canonical Fake Heart simulator
 ```
 
 ## Current state
 
-**Scaffold only.** `src/index.ts` prints a line and exits.
-
-First tasks, in order: `src/envelope.ts` (field list, `newEnvelope`, `encode`/`decode`, a `parse`
-that returns a valid envelope **or an error** and never a half-valid object) → `src/topics.ts`
-(only the topics that exist today — resist adding the ones that don't) → `src/fake-heart.ts`.
+**Fully implemented & tested.**
+- Universal 10-field envelope format (`src/envelope/`)
+- Isolated JSON wire codec with strict runtime validation (`src/codec/`)
+- Topics registry for `sys.*` and `voice.*` (`src/topics/`)
+- Canonical Fake Heart simulator with heartbeat watchdog & jittered backoff (`src/simulator/fake-heart.ts`)
+- 31 cross-language conformance test vectors (`conformance/`)
+- Exhaustive masterclass learning guide in `TEACHER.md`
 
 ## Where the design lives
 
-- `../../03 Engineering/Protocol/ENVELOPE.md` — **the full specification.** Message kinds,
-  acknowledgement, idempotency, queuing, expiry, error handling, and three worked examples to check
-  any change against.
-- `../../03 Engineering/Project/LINEAR_ISSUES.md` — W1-01 and W1-02 are this repo
+- `TEACHER.md` — **The ultimate systems & TypeScript masterclass for this protocol.**
+- `../../03 Engineering/Protocol/ENVELOPE.md` — **The full specification.** Message kinds, acknowledgement, idempotency, queuing, expiry, error handling, and worked examples.
+
