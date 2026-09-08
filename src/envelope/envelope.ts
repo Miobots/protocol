@@ -21,6 +21,9 @@ export function getMonotonicNs(): string {
   if (typeof process !== 'undefined' && typeof process.hrtime?.bigint === 'function') {
     return process.hrtime.bigint().toString();
   }
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return Math.floor(performance.now() * 1_000_000).toString();
+  }
   return (Date.now() * 1_000_000).toString();
 }
 

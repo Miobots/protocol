@@ -8,6 +8,34 @@ import { ProtocolError, type Envelope } from '../envelope/types.ts';
 const VALID_KINDS = new Set<string>(Object.values(Kind));
 const DIGITS_ONLY = /^\d+$/;
 
+const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
+
+export function getUtf8ByteLength(str: string): number {
+  if (textEncoder) {
+    return textEncoder.encode(str).length;
+  }
+  let s = str.length;
+  for (let i = str.length - 1; i >= 0; i--) {
+    const code = str.charCodeAt(i);
+    if (code > 0x7f && code <= 0x7ff) s++;
+    else if (code > 0x7ff && code <= 0xffff) s += 2;
+    if (code >= 0xdc00 && code <= 0xdfff) i--;
+  }
+  return s;
+}
+
+export function decodeUtf8(bytes: Uint8Array): string {
+  if (textDecoder) {
+    return textDecoder.decode(bytes);
+  }
+  let result = '';
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]!);
+  }
+  return result;
+}
+
 /**
  * Encodes an envelope into a wire-ready JSON string.
  */
@@ -120,7 +148,7 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
   // Check payload size
   try {
     const payloadStr = JSON.stringify(candidate['payload']);
-    if (payloadStr && Buffer.byteLength(payloadStr, 'utf-8') > ProtocolDefaults.MAX_PAYLOAD_BYTES) {
+    if (payloadStr && getUtf8ByteLength(payloadStr) > ProtocolDefaults.MAX_PAYLOAD_BYTES) {
       throw new ProtocolError('Payload exceeds maximum size limit', ProtocolErrorCode.ERR_PAYLOAD_TOO_LARGE, {
         reason: ProtocolErrorReason.OVERSIZED_PAYLOAD,
         field: 'payload',
@@ -177,19 +205,19 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
 }
 
 /**
- * Decodes a raw wire string or Buffer into a validated Envelope.
+ * Decodes a raw wire string or binary buffer into a validated Envelope.
  */
 export function decode<TTopic extends string = string, TPayload = unknown>(
-  raw: string | Buffer | Uint8Array
+  raw: string | Uint8Array
 ): Envelope<TTopic, TPayload> {
-  const byteLength = typeof raw === 'string' ? Buffer.byteLength(raw, 'utf-8') : raw.byteLength;
+  const byteLength = typeof raw === 'string' ? getUtf8ByteLength(raw) : raw.byteLength;
   if (byteLength > ProtocolDefaults.MAX_MESSAGE_BYTES) {
     throw new ProtocolError('Wire message exceeds maximum size limit', ProtocolErrorCode.ERR_PAYLOAD_TOO_LARGE, {
       reason: ProtocolErrorReason.OVERSIZED_PAYLOAD,
     });
   }
 
-  const str = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
+  const str = typeof raw === 'string' ? raw : decodeUtf8(raw);
 
   let parsed: unknown;
   try {
@@ -212,7 +240,7 @@ export type ParseResult<TTopic extends string, TPayload> =
  * Safely parses and validates a wire payload without throwing.
  */
 export function parse<TTopic extends string = string, TPayload = unknown>(
-  raw: string | Buffer | Uint8Array
+  raw: string | Uint8Array
 ): ParseResult<TTopic, TPayload> {
   try {
     const data = decode<TTopic, TPayload>(raw);
