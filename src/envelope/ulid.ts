@@ -3,7 +3,6 @@
  * Uses Crockford's Base32 character set with 48-bit timestamp and 80-bit randomness.
  */
 
-import { randomBytes } from 'node:crypto';
 import { ProtocolDefaults } from '../constants/index.ts';
 
 const ALPHABET = ProtocolDefaults.CROCKFORD_BASE32_ALPHABET;
@@ -19,8 +18,20 @@ function encodeTime(now: number, len: number): string {
   return str;
 }
 
+function getRandomBytes(len: number): Uint8Array {
+  const bytes = new Uint8Array(len);
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < len; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return bytes;
+}
+
 function encodeRandom(len: number): string {
-  const bytes = randomBytes(len);
+  const bytes = getRandomBytes(len);
   let str = '';
   for (let i = 0; i < len; i++) {
     const byte = bytes[i] ?? 0;
