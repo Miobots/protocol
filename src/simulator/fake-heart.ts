@@ -25,15 +25,18 @@ import {
   type WelcomePayload,
   type SpeakPayload,
   type HeartbeatPayload,
+  type CapabilityManifestPayload,
 } from '../index.ts';
 
 const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL;
 const DEV_TOKEN = process.env['DEV_TOKEN'] || ProtocolDefaults.DEFAULT_DEV_TOKEN;
 const DEVICE_ID = process.env['DEVICE_ID'] || ProtocolDefaults.DEFAULT_FAKE_HEART_ID;
+const DOCKING_UNAVAILABLE = process.env['FAKE_HEART_DOCKING_UNAVAILABLE'] === 'true';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
+let capabilityTimer: NodeJS.Timeout | null = null;
 let backoffDelayMs: number = ProtocolDefaults.RECONNECT_INITIAL_DELAY_MS;
 const MAX_BACKOFF_MS = ProtocolDefaults.RECONNECT_MAX_DELAY_MS;
 const BACKOFF_MULTIPLIER = ProtocolDefaults.RECONNECT_BACKOFF_MULTIPLIER;
@@ -70,6 +73,10 @@ function cleanupTimers(): void {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
+  }
+  if (capabilityTimer) {
+    clearInterval(capabilityTimer);
+    capabilityTimer = null;
   }
 }
 
@@ -108,6 +115,31 @@ function startHeartbeat(): void {
       ws.terminate();
     }
   }, ProtocolDefaults.HEARTBEAT_INTERVAL_MS);
+}
+
+function sendCapabilities(): void {
+  capabilityTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      cleanupTimers();
+      return;
+    }
+
+    const capabilityEnv = newEnvelope<typeof Topics.CAP_MANIFEST, CapabilityManifestPayload>({
+      kind: Kind.EVT,
+      topic: Topics.CAP_MANIFEST,
+      seq: outboundSeq,
+      payload: {
+        capabilities: {
+          navigation: { state: 'available' },
+          docking: DOCKING_UNAVAILABLE
+            ? { state: 'unavailable', reason: 'no dock in the map yet' }
+            : { state: 'available' },
+          voice: { state: 'degraded', note: 'offline - simple phrasing only' },
+        },
+      },
+    });
+    sendEnvelope(capabilityEnv);
+  }, ProtocolDefaults.CAP_MANIFEST_INTERVAL_MS);
 }
 
 export function connect(): void {
@@ -156,6 +188,7 @@ export function connect(): void {
       if (welcome.accepted) {
         log(`Handshake accepted by Brain! Session: ${welcome.session_id}`);
         startHeartbeat();
+        sendCapabilities();
       } else {
         log(`Handshake rejected by Brain: ${welcome.reason || 'Unauthorized'}. Closing socket.`);
         cleanupTimers();
