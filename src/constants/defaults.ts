@@ -29,6 +29,10 @@ export const ProtocolDefaults = {
   DEFAULT_COMMAND_TIMEOUT_MS: 5000,
   DEFAULT_APPROVAL_TIMEOUT_MS: 60000,
 
+  // Idempotency — how long a receiver remembers an idem_key so it can replay the original ACK
+  // instead of executing twice (ENVELOPE.md §5). Both sides derive from this; nobody re-declares it.
+  IDEMPOTENCY_TTL_MS: 600000,
+
   // Payload & Message Size Constraints (64 KB)
   MAX_PAYLOAD_BYTES: 65536,
   MAX_MESSAGE_BYTES: 65536,
