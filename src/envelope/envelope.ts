@@ -5,6 +5,20 @@
 import { generateUlid } from './ulid.ts';
 import { Kind, type AckPayload, type Envelope } from './types.ts';
 import { SequenceCounter } from './sequence.ts';
+// Type-only: erased at compile time, so no runtime cycle with topics/sys.ts.
+import type { TopicPayloadMap } from '../topics/registry.ts';
+
+/**
+ * The payload a topic is allowed to carry (P0.3).
+ *
+ * A **registered** topic is pinned to its own payload, plus `AckPayload` — because an ACK replying
+ * on a command topic carries the acknowledgement, not the command (ENVELOPE.md §4). An
+ * unregistered topic string falls back to `TFallback`, which keeps ad-hoc and not-yet-registered
+ * topics usable without weakening the registered ones.
+ */
+export type PayloadFor<TTopic extends string, TFallback> = TTopic extends keyof TopicPayloadMap
+  ? TopicPayloadMap[TTopic] | AckPayload
+  : TFallback;
 
 export function getMonotonicNs(): string {
   if (typeof process !== 'undefined' && typeof process.hrtime?.bigint === 'function') {
@@ -19,7 +33,8 @@ export function getMonotonicNs(): string {
 export interface NewEnvelopeOptions<TTopic extends string, TPayload> {
   kind: Kind;
   topic: TTopic;
-  payload: TPayload;
+  /** Bound to `topic` for registered topics — see {@link PayloadFor}. */
+  payload: PayloadFor<TTopic, TPayload>;
   /**
    * REQUIRED. ENVELOPE.md §6: `seq` is a per-connection, per-direction counter, and a process
    * holding several connections keeps one counter per connection. There is deliberately no
@@ -40,14 +55,14 @@ export interface NewEnvelopeOptions<TTopic extends string, TPayload> {
  */
 export function newEnvelope<TTopic extends string, TPayload>(
   options: NewEnvelopeOptions<TTopic, TPayload>
-): Envelope<TTopic, TPayload> {
+): Envelope<TTopic, PayloadFor<TTopic, TPayload>> {
   const msg_id = options.msg_id ?? generateUlid();
   const corr_id = options.corr_id ?? msg_id;
   const t_wall_ms = options.t_wall_ms ?? Date.now();
   const t_mono_ns = options.t_mono_ns ?? getMonotonicNs();
   const seq = options.seq instanceof SequenceCounter ? options.seq.next() : options.seq;
 
-  const envelope: Envelope<TTopic, TPayload> = {
+  const envelope: Envelope<TTopic, PayloadFor<TTopic, TPayload>> = {
     msg_id,
     corr_id,
     t_mono_ns,
@@ -87,6 +102,8 @@ export function createAck<TTopic extends string>(
     topic: originalEnvelope.topic,
     corr_id: originalEnvelope.corr_id,
     seq,
-    payload,
-  });
+    // TTopic is unresolved here, so PayloadFor<TTopic, AckPayload> stays a deferred conditional.
+    // AckPayload is a member of both of its branches, so the cast is sound.
+    payload: payload as PayloadFor<TTopic, AckPayload>,
+  }) as Envelope<TTopic, AckPayload>;
 }

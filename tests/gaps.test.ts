@@ -14,6 +14,7 @@ import {
   createSequenceCounter,
   SequenceGapDetector,
   type HelloPayload,
+  type HeartbeatPayload,
 } from '../src/index.ts';
 import { calculateBackoffWithJitter } from '../src/simulator/fake-heart.ts';
 
@@ -83,7 +84,7 @@ describe('P0.7 Spec Gaps Fixes', () => {
     });
 
     it('creates compliant sys.heartbeat event envelopes in both directions', () => {
-      const hb = newEnvelope({
+      const hb = newEnvelope<typeof Topics.SYS_HEARTBEAT, HeartbeatPayload>({
         kind: Kind.EVT,
         topic: Topics.SYS_HEARTBEAT,
         payload: {
@@ -96,8 +97,9 @@ describe('P0.7 Spec Gaps Fixes', () => {
 
       assert.equal(hb.kind, Kind.EVT);
       assert.equal(hb.topic, Topics.SYS_HEARTBEAT);
-      assert.equal(hb.payload.status, SystemHealth.OK);
-      assert.equal(typeof hb.payload.t_wall_ms, 'number');
+      const hbPayload = hb.payload as HeartbeatPayload;
+      assert.equal(hbPayload.status, SystemHealth.OK);
+      assert.equal(typeof hbPayload.t_wall_ms, 'number');
     });
   });
 

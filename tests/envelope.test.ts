@@ -67,10 +67,10 @@ describe('Envelope Factory (newEnvelope)', () => {
     const heart = new SequenceCounter();
     const synapse = new SequenceCounter();
 
-    const h1 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: heart });
-    const s1 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: synapse });
-    const h2 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: heart });
-    const s2 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: synapse });
+    const h1 = newEnvelope({ kind: Kind.EVT, topic: 'test.tick', payload: {}, seq: heart });
+    const s1 = newEnvelope({ kind: Kind.EVT, topic: 'test.tick', payload: {}, seq: synapse });
+    const h2 = newEnvelope({ kind: Kind.EVT, topic: 'test.tick', payload: {}, seq: heart });
+    const s2 = newEnvelope({ kind: Kind.EVT, topic: 'test.tick', payload: {}, seq: synapse });
 
     // Interleaved sends must not steal each other's numbers.
     assert.deepEqual([h1.seq, h2.seq], [1, 2]);
@@ -112,3 +112,49 @@ describe('Envelope Factory (newEnvelope)', () => {
   });
 });
 
+
+describe('Topic → payload binding (P0.3)', () => {
+  // P0.3's exit check is "typecheck binds topic to payload". Before this, a `voice.speak`
+  // envelope carrying an unrelated object compiled clean — the binding was a convention held up
+  // by hand-written generic arguments, not a check. These cases fail the BUILD, not the run, so
+  // `tsc --noEmit` is what actually asserts them; the runtime bodies only keep the file honest.
+
+  it('rejects a payload that does not belong to the topic', () => {
+    const conn = new SequenceCounter();
+
+    // @ts-expect-error — voice.speak carries SpeakPayload, not an arbitrary object.
+    newEnvelope({ kind: Kind.CMD, topic: Topics.VOICE_SPEAK, payload: { totally: 'wrong' }, seq: conn });
+
+    // @ts-expect-error — sys.hello needs device_id/token/protocol_version/role.
+    newEnvelope({ kind: Kind.CMD, topic: Topics.SYS_HELLO, payload: { text: 'hi' }, seq: conn });
+
+    assert.ok(true);
+  });
+
+  it('accepts the topic\'s own payload, and an ACK replying on that topic', () => {
+    const conn = new SequenceCounter();
+
+    const cmd = newEnvelope({
+      kind: Kind.CMD,
+      topic: Topics.VOICE_SPEAK,
+      payload: { text: 'Salam', lang: Language.UR },
+      seq: conn,
+    });
+    assert.equal(cmd.topic, Topics.VOICE_SPEAK);
+
+    // ENVELOPE.md §4 — an ACK on a command topic carries the acknowledgement, not the command.
+    const ack = newEnvelope({
+      kind: Kind.ACK,
+      topic: Topics.VOICE_SPEAK,
+      payload: { accepted: true },
+      seq: conn,
+    });
+    assert.equal(ack.kind, Kind.ACK);
+  });
+
+  it('leaves unregistered topics free, so ad-hoc topics stay usable', () => {
+    const conn = new SequenceCounter();
+    const env = newEnvelope({ kind: Kind.EVT, topic: 'sensor.temp', payload: { celsius: 24.5 }, seq: conn });
+    assert.deepEqual(env.payload, { celsius: 24.5 });
+  });
+});
