@@ -20,6 +20,7 @@ import {
   encode,
   parse,
   SequenceCounter,
+  HeartCapabilities,
   type Envelope,
   type HelloPayload,
   type WelcomePayload,
@@ -178,12 +179,19 @@ function sendCapabilities(): void {
       topic: Topics.CAP_MANIFEST,
       seq: outboundSeq,
       payload: {
+        // The robot's half only (TASKS.md S1.2). IDs come from the shared registry so that the
+        // publisher and whatever renders it cannot drift apart.
         capabilities: {
-          navigation: { state: 'available' },
-          docking: DOCKING_UNAVAILABLE
+          [HeartCapabilities.DRIVING]: { state: 'available' },
+          [HeartCapabilities.DOCKING]: DOCKING_UNAVAILABLE
             ? { state: 'unavailable', reason: 'no dock in the map yet' }
             : { state: 'available' },
-          voice: { state: 'degraded', note: 'offline - simple phrasing only' },
+          [HeartCapabilities.RECORDING]: { state: 'available' },
+          [HeartCapabilities.LOCAL_VOICE]: {
+            state: 'degraded',
+            note: 'offline — simple phrasing only',
+          },
+          [HeartCapabilities.ROBOT_HEALTH]: { state: 'available' },
         },
       },
     });
