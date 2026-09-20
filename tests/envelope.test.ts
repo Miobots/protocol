@@ -8,7 +8,7 @@ import {
   ExecutionStatus,
   newEnvelope,
   createAck,
-  resetSequence,
+  SequenceCounter,
   generateUlid,
   type SpeakPayload,
 } from '../src/index.ts';
@@ -29,13 +29,14 @@ describe('ULID Generator', () => {
 
 describe('Envelope Factory (newEnvelope)', () => {
   it('populates all mandatory 10 fields correctly', () => {
-    resetSequence(0);
+    const conn = new SequenceCounter(0);
 
     const env = newEnvelope<typeof Topics.VOICE_SPEAK, SpeakPayload>({
       kind: Kind.CMD,
       topic: Topics.VOICE_SPEAK,
       payload: { text: 'Salam', lang: Language.UR },
       idem_key: 'key-123',
+      seq: conn,
     });
 
     assert.equal(typeof env.msg_id, 'string');
@@ -52,25 +53,49 @@ describe('Envelope Factory (newEnvelope)', () => {
     assert.deepEqual(env.payload, { text: 'Salam', lang: Language.UR });
   });
 
-  it('increments sequence numbers monotonically', () => {
-    resetSequence(10);
-    const env1 = newEnvelope({ kind: Kind.EVT, topic: 'test.one', payload: {} });
-    const env2 = newEnvelope({ kind: Kind.EVT, topic: 'test.two', payload: {} });
+  it('increments sequence numbers monotonically within one connection', () => {
+    const conn = new SequenceCounter(10);
+    const env1 = newEnvelope({ kind: Kind.EVT, topic: 'test.one', payload: {}, seq: conn });
+    const env2 = newEnvelope({ kind: Kind.EVT, topic: 'test.two', payload: {}, seq: conn });
     assert.equal(env1.seq, 11);
     assert.equal(env2.seq, 12);
   });
 
+  it('keeps counters independent across connections — ENVELOPE.md §6', () => {
+    // The failure this guards: one shared counter makes gap detection meaningless the moment
+    // Heart, Synapse and Ganglion are attached at once. Each connection must count for itself.
+    const heart = new SequenceCounter();
+    const synapse = new SequenceCounter();
+
+    const h1 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: heart });
+    const s1 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: synapse });
+    const h2 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: heart });
+    const s2 = newEnvelope({ kind: Kind.EVT, topic: 'sys.heartbeat', payload: {}, seq: synapse });
+
+    // Interleaved sends must not steal each other's numbers.
+    assert.deepEqual([h1.seq, h2.seq], [1, 2]);
+    assert.deepEqual([s1.seq, s2.seq], [1, 2]);
+  });
+
   it('creates ACK envelopes linked to original correlation ID', () => {
+    const inbound = new SequenceCounter();
+    const outbound = new SequenceCounter();
+
     const cmd = newEnvelope<typeof Topics.VOICE_SPEAK, SpeakPayload>({
       kind: Kind.CMD,
       topic: Topics.VOICE_SPEAK,
       payload: { text: 'Hello', lang: Language.EN },
+      seq: inbound,
     });
 
-    const ack = createAck(cmd, {
-      accepted: true,
-      exec_status: ExecutionStatus.EXECUTING,
-    });
+    const ack = createAck(
+      cmd,
+      { accepted: true, exec_status: ExecutionStatus.EXECUTING },
+      outbound
+    );
+
+    // The ACK counts on the responder's own outbound direction, not the command's.
+    assert.equal(ack.seq, 1);
 
     assert.equal(ack.kind, Kind.ACK);
     assert.equal(ack.corr_id, cmd.corr_id);
@@ -80,8 +105,9 @@ describe('Envelope Factory (newEnvelope)', () => {
   });
 
   it('ensures monotonic timestamp (t_mono_ns) progresses forward', () => {
-    const env1 = newEnvelope({ kind: Kind.EVT, topic: 'test.clock1', payload: {} });
-    const env2 = newEnvelope({ kind: Kind.EVT, topic: 'test.clock2', payload: {} });
+    const conn = new SequenceCounter();
+    const env1 = newEnvelope({ kind: Kind.EVT, topic: 'test.clock1', payload: {}, seq: conn });
+    const env2 = newEnvelope({ kind: Kind.EVT, topic: 'test.clock2', payload: {}, seq: conn });
     assert.ok(BigInt(env2.t_mono_ns) >= BigInt(env1.t_mono_ns));
   });
 });

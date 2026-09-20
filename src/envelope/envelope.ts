@@ -6,17 +6,6 @@ import { generateUlid } from './ulid.ts';
 import { Kind, type AckPayload, type Envelope } from './types.ts';
 import { SequenceCounter } from './sequence.ts';
 
-let globalSequenceCounter = 0;
-
-export function getNextSequence(): number {
-  globalSequenceCounter = (globalSequenceCounter + 1) >>> 0;
-  return globalSequenceCounter;
-}
-
-export function resetSequence(initialValue = 0): void {
-  globalSequenceCounter = initialValue >>> 0;
-}
-
 export function getMonotonicNs(): string {
   if (typeof process !== 'undefined' && typeof process.hrtime?.bigint === 'function') {
     return process.hrtime.bigint().toString();
@@ -31,11 +20,17 @@ export interface NewEnvelopeOptions<TTopic extends string, TPayload> {
   kind: Kind;
   topic: TTopic;
   payload: TPayload;
+  /**
+   * REQUIRED. ENVELOPE.md §6: `seq` is a per-connection, per-direction counter, and a process
+   * holding several connections keeps one counter per connection. There is deliberately no
+   * default — a shared fallback makes gap detection meaningless the moment Heart, Synapse and
+   * Ganglion are attached at once, so the caller must name the connection it is sending on.
+   */
+  seq: number | SequenceCounter;
   corr_id?: string;
   msg_id?: string;
   idem_key?: string;
   expires_at?: number;
-  seq?: number | SequenceCounter;
   t_wall_ms?: number;
   t_mono_ns?: string;
 }
@@ -50,12 +45,7 @@ export function newEnvelope<TTopic extends string, TPayload>(
   const corr_id = options.corr_id ?? msg_id;
   const t_wall_ms = options.t_wall_ms ?? Date.now();
   const t_mono_ns = options.t_mono_ns ?? getMonotonicNs();
-  const seq =
-    options.seq instanceof SequenceCounter
-      ? options.seq.next()
-      : typeof options.seq === 'number'
-      ? options.seq
-      : getNextSequence();
+  const seq = options.seq instanceof SequenceCounter ? options.seq.next() : options.seq;
 
   const envelope: Envelope<TTopic, TPayload> = {
     msg_id,
@@ -83,15 +73,20 @@ export function newEnvelope<TTopic extends string, TPayload>(
 
 /**
  * Creates an ACK envelope replying to a specific incoming command or query envelope.
+ *
+ * `seq` is the responder's own outbound counter for the connection the ACK goes out on — not the
+ * sequence of the envelope being answered. The two directions count independently (ENVELOPE.md §6).
  */
 export function createAck<TTopic extends string>(
   originalEnvelope: Envelope<TTopic, unknown>,
-  payload: AckPayload
+  payload: AckPayload,
+  seq: number | SequenceCounter
 ): Envelope<TTopic, AckPayload> {
   return newEnvelope<TTopic, AckPayload>({
     kind: Kind.ACK,
     topic: originalEnvelope.topic,
     corr_id: originalEnvelope.corr_id,
+    seq,
     payload,
   });
 }

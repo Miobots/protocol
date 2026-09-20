@@ -55,6 +55,7 @@ describe('P0.7 Spec Gaps Fixes', () => {
           protocol_version: 99,
           role: DeviceRole.HEART,
         },
+        seq: new SequenceCounter(),
       });
 
       const validation = validateHello(helloCmd.payload);
@@ -63,6 +64,7 @@ describe('P0.7 Spec Gaps Fixes', () => {
       const welcomeAck = createWelcomeAck(helloCmd, {
         accepted: false,
         reason: validation.error,
+        seq: new SequenceCounter(),
       });
 
       assert.equal(welcomeAck.kind, Kind.ACK);
@@ -89,6 +91,7 @@ describe('P0.7 Spec Gaps Fixes', () => {
           t_wall_ms: Date.now(),
           battery_pct: 88,
         },
+        seq: new SequenceCounter(),
       });
 
       assert.equal(hb.kind, Kind.EVT);

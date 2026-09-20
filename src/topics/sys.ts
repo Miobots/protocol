@@ -1,5 +1,6 @@
 import { DeviceRole, SystemHealth, ProtocolDefaults, Kind } from '../constants/index.ts';
 import { newEnvelope } from '../envelope/envelope.ts';
+import type { SequenceCounter } from '../envelope/sequence.ts';
 import type { Envelope } from '../envelope/types.ts';
 
 export interface HelloPayload {
@@ -87,6 +88,8 @@ export function createWelcomeAck(
   helloEnv: Envelope<string, unknown>,
   options: {
     accepted: boolean;
+    /** The hub's own outbound counter for this connection (ENVELOPE.md §6). */
+    seq: number | SequenceCounter;
     sessionId?: string;
     serverWallMs?: number;
     reason?: string;
@@ -106,6 +109,7 @@ export function createWelcomeAck(
     kind: Kind.ACK,
     topic: 'sys.welcome',
     corr_id: helloEnv.corr_id,
+    seq: options.seq,
     payload,
   });
 }
