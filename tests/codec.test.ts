@@ -7,6 +7,7 @@ import {
   DeviceRole,
   ProtocolErrorCode,
   newEnvelope,
+  SequenceCounter,
   encode,
   decode,
   parse,
@@ -27,6 +28,7 @@ describe('Envelope Codec (encode / decode / parse)', () => {
       },
       idem_key: 'idem-456',
       expires_at: Date.now() + 5000,
+      seq: new SequenceCounter(),
     });
 
     const encoded = encode(original);
@@ -41,6 +43,7 @@ describe('Envelope Codec (encode / decode / parse)', () => {
       kind: Kind.EVT,
       topic: 'sensor.temp',
       payload: { celsius: 24.5 },
+      seq: new SequenceCounter(),
     });
 
     const result = parse(encode(original));

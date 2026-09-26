@@ -204,11 +204,11 @@ export function connect(): void {
       const priority = speak.priority || Priority.NORMAL;
       console.log(`\n🔊 [SPEAK ${lang}] "${speak.text}" (priority: ${priority})\n`);
 
-      const ack = createAck(env, {
-        accepted: true,
-        exec_status: ExecutionStatus.COMPLETED,
-      });
-      ack.seq = outboundSeq.next();
+      const ack = createAck(
+        env,
+        { accepted: true, exec_status: ExecutionStatus.COMPLETED },
+        outboundSeq
+      );
       sendEnvelope(ack);
       log(`Sent ACK for msg_id: ${env.msg_id}`);
       return;
