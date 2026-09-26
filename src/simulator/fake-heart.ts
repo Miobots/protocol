@@ -26,6 +26,7 @@ import {
   type SpeakPayload,
   type HeartbeatPayload,
   type CapabilityManifestPayload,
+  type AckPayload,
 } from '../index.ts';
 
 const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL;
@@ -49,6 +50,51 @@ let lastHeartbeatReceivedMs = 0;
 function log(message: string): void {
   const time = new Date().toISOString().substring(11, 23);
   console.log(`[${time}] [Fake Heart] ${message}`);
+}
+
+/**
+ * Receiver-side idempotency (B0.5, ENVELOPE.md §5).
+ *
+ * The Brain de-duplicates on the way *out*; that stops it re-sending, not the receiver
+ * re-executing. A retry that crosses the wire — a flaky hotspot, a reconnect drain — still
+ * arrives here, so the side that performs the action is the side that has to remember.
+ *
+ * Deliberately survives reconnects: the retry that matters is the one after the link dropped.
+ */
+interface RememberedAck {
+  ack: Envelope<string, AckPayload>;
+  atMs: number;
+}
+const executedCommands = new Map<string, RememberedAck>();
+
+export function replayIfSeen(idemKey: string | undefined): Envelope<string, AckPayload> | undefined {
+  if (!idemKey) return undefined;
+  const seen = executedCommands.get(idemKey);
+  if (!seen) return undefined;
+  if (Date.now() - seen.atMs >= ProtocolDefaults.IDEMPOTENCY_TTL_MS) {
+    executedCommands.delete(idemKey);
+    return undefined;
+  }
+  return seen.ack;
+}
+
+export function remember(idemKey: string | undefined, ack: Envelope<string, AckPayload>): void {
+  if (!idemKey) return;
+  executedCommands.set(idemKey, { ack, atMs: Date.now() });
+}
+
+/** Drops entries past the TTL. Called from the heartbeat tick, which already runs every 5 s. */
+export function pruneIdempotencyCache(nowMs: number = Date.now()): void {
+  for (const [key, seen] of executedCommands) {
+    if (nowMs - seen.atMs >= ProtocolDefaults.IDEMPOTENCY_TTL_MS) {
+      executedCommands.delete(key);
+    }
+  }
+}
+
+/** Test seam — the cache is module state and outlives a single connection by design. */
+export function resetIdempotencyCache(): void {
+  executedCommands.clear();
 }
 
 /**
@@ -103,7 +149,10 @@ function startHeartbeat(): void {
     });
     sendEnvelope(heartbeatEnv);
 
-    // 2. Watchdog: check for 3 missed heartbeats from Brain (> 15s)
+    // 2. Drop idempotency entries past their TTL (piggy-backed on this tick, no extra timer)
+    pruneIdempotencyCache();
+
+    // 3. Watchdog: check for 3 missed heartbeats from Brain (> 15s)
     const elapsedSinceLastPeerBeat = Date.now() - lastHeartbeatReceivedMs;
     if (elapsedSinceLastPeerBeat >= ProtocolDefaults.HEARTBEAT_TIMEOUT_MS) {
       log(
@@ -199,6 +248,15 @@ export function connect(): void {
 
     // Handle voice.speak command
     if (env.topic === Topics.VOICE_SPEAK && env.kind === Kind.CMD) {
+      // Replay before executing. ENVELOPE.md §5: "Every CMD carries an idem_key and is never
+      // executed twice." A flaky hotspot must not make the robot say the same thing three times.
+      const replayed = replayIfSeen(env.idem_key);
+      if (replayed) {
+        sendEnvelope(replayed);
+        log(`Duplicate idem_key=${env.idem_key} — replayed original ACK, did not speak again`);
+        return;
+      }
+
       const speak = env.payload as SpeakPayload;
       const lang = speak.lang || Language.EN;
       const priority = speak.priority || Priority.NORMAL;
@@ -209,6 +267,7 @@ export function connect(): void {
         { accepted: true, exec_status: ExecutionStatus.COMPLETED },
         outboundSeq
       );
+      remember(env.idem_key, ack);
       sendEnvelope(ack);
       log(`Sent ACK for msg_id: ${env.msg_id}`);
       return;
