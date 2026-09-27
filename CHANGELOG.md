@@ -4,6 +4,74 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-09-27 — Receiver-side expiry in the Fake Heart (B0.5) · #11
+
+The Fake Heart ACKed `accepted: true` however late a command arrived. The codec's check compares
+`expires_at` with the sender's own `t_wall_ms`, both stamped at send time, so a command delayed on
+the wire passed it. Lateness is only visible against the receiver's clock.
+
+### Added
+
+- **`rejectIfExpired()`** in `src/simulator/fake-heart.ts`: a command at or past `expires_at` gets
+  an ACK with `accepted: false`, `reason: "expired"`, `exec_status: "rejected"` and is not executed.
+  It runs after the duplicate replay, so a retry of a command that already ran still gets its
+  original ACK, and the rejection is remembered under the `idem_key`.
+- **`tests/expiry.test.ts`** (4 tests).
+
+The real Heart's `mio_gateway` needs the same check (H3.4).
+
+## 2026-09-27 — Fixes from the 2026-09-20 review · #6 #7 #8 #9 #10
+
+Five exit checks that had been ticked did not hold. Each was fixed here before its consumers.
+
+### Fixed
+
+- **Per-connection `seq` (P0.7) · #6.** `newEnvelope()` still fell back to a process-global counter
+  when no `SequenceCounter` was passed — the exact failure ENVELOPE §6 names. The fallback is gone;
+  every caller passes its connection's counter.
+- **Topic bound to payload (P0.3) · #7.** Nothing tied a topic to its payload, so a `voice.speak`
+  envelope with an unrelated payload typechecked. `src/topics/registry.ts` (`TopicPayloadMap`) now
+  binds them at compile time, and adding a topic without a payload is a compile error.
+- **Receiver-side idempotency (B0.5) · #8.** Idempotency was sender-side only, so the Fake Heart
+  re-executed duplicates. It now remembers each `idem_key` for 10 minutes and replays the original
+  ACK instead of acting twice. Added `tests/idempotency.test.ts`.
+- **Capability IDs the app renders (S1.2) · #9.** The stub manifest published `navigation` and
+  `voice`, which no consumer knew. `src/topics/capability.ts` now pins `HeartCapabilities` and
+  `BrainCapabilities`, and the Fake Heart publishes the robot's half from the shared IDs.
+
+### Changed
+
+- **#10** tracks `ANTIGRAVITY.md` and pins TypeScript exactly, matching the other repositories.
+
+## 2026-09-13 — `cap.manifest` from the Fake Heart (P2.3) · #5
+
+### Added
+
+- The `cap.manifest` topic and its payload types.
+- The Fake Heart publishes a capability manifest every 10 s after a successful handshake
+  (`ProtocolDefaults.CAP_MANIFEST_INTERVAL_MS`).
+- `FAKE_HEART_DOCKING_UNAVAILABLE=true` publishes docking as unavailable, for testing the
+  `unavailable` state.
+
+## 2026-09-08 — Isomorphic package for React Native and browsers · #4
+
+Synapse bundles this package with Metro, which failed on Node-only APIs.
+
+### Changed
+
+- **`src/envelope/ulid.ts`:** `globalThis.crypto.getRandomValues` instead of `node:crypto`.
+- **`src/codec/json.ts`:** `TextEncoder`/`TextDecoder` instead of `Buffer`; `decode` and `parse`
+  accept `string | Uint8Array`.
+- **`src/envelope/envelope.ts`:** falls back to `performance.now()` for the monotonic clock when
+  `process.hrtime` is absent.
+
+## 2026-09-04 — Package exports · #3
+
+### Changed
+
+- `package.json` declares `main`, `types` and `exports`, so consumers resolve one entry point.
+- `README.md` and `CLAUDE.md` updated for the Bun toolchain.
+
 ## 2026-08-19 05:40 PKT — P0.7: Closing the Four Spec Gaps (Version Handshake, Heartbeat Watchdog, Jitter & Sequence Counters)
 
 ### Summary Description

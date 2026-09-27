@@ -65,13 +65,16 @@ bun run sim      # Starts the canonical Fake Heart simulator
 **Fully implemented & tested.**
 - Universal 10-field envelope format (`src/envelope/`)
 - Isolated JSON wire codec with strict runtime validation (`src/codec/`)
-- Topics registry for `sys.*` and `voice.*` (`src/topics/`)
-- Canonical Fake Heart simulator with heartbeat watchdog & jittered backoff (`src/simulator/fake-heart.ts`)
-- 31 cross-language conformance test vectors (`conformance/`)
-- Exhaustive masterclass learning guide in `TEACHER.md`
+- Topic registry for `sys.*`, `cap.manifest` and `voice.*`, with each topic bound to its payload type at compile time (`src/topics/registry.ts`)
+- Shared capability IDs for both manifest halves (`src/topics/capability.ts`)
+- Canonical Fake Heart simulator with heartbeat watchdog, jittered backoff, receiver-side idempotency and expiry, and the robot's half of `cap.manifest` every 10 s (`src/simulator/fake-heart.ts`)
+- 31 cross-language conformance test vectors (`conformance/`) — read only by the TypeScript suite until `mio_gateway` exists
+- `TEACHER.md` — a local study guide, gitignored
+
+**Consumers must re-run `bun install` after any change here** — a `file:` dependency is linked as per-file symlinks at install time.
 
 ## Where the design lives
 
-- `TEACHER.md` — **The ultimate systems & TypeScript masterclass for this protocol.**
+- `TEACHER.md` (local, gitignored) — a systems & TypeScript study guide for this protocol.
 - `../../03 Engineering/Protocol/ENVELOPE.md` — **The full specification.** Message kinds, acknowledgement, idempotency, queuing, expiry, error handling, and worked examples.
 
