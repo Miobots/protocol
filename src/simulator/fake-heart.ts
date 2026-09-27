@@ -15,6 +15,7 @@ import {
   ExecutionStatus,
   Priority,
   ProtocolDefaults,
+  ProtocolErrorReason,
   newEnvelope,
   createAck,
   encode,
@@ -91,6 +92,26 @@ export function pruneIdempotencyCache(nowMs: number = Date.now()): void {
       executedCommands.delete(key);
     }
   }
+}
+
+/**
+ * Receiver-side expiry (B0.5, ENVELOPE.md §6 and §9).
+ *
+ * The codec only checks `expires_at` against the sender's own `t_wall_ms`, both stamped at send
+ * time, so a command that arrives late still passes it. Lateness is only visible here, against the
+ * receiver's clock. Returns the rejecting ACK, or undefined if the command is still live.
+ */
+export function rejectIfExpired(
+  env: Envelope,
+  seq: SequenceCounter,
+  nowMs: number = Date.now()
+): Envelope<string, AckPayload> | undefined {
+  if (env.expires_at === undefined || nowMs < env.expires_at) return undefined;
+  return createAck(
+    env,
+    { accepted: false, reason: ProtocolErrorReason.EXPIRED, exec_status: ExecutionStatus.REJECTED },
+    seq
+  );
 }
 
 /** Test seam — the cache is module state and outlives a single connection by design. */
@@ -262,6 +283,15 @@ export function connect(): void {
       if (replayed) {
         sendEnvelope(replayed);
         log(`Duplicate idem_key=${env.idem_key} — replayed original ACK, did not speak again`);
+        return;
+      }
+
+      // After the replay: a retry of a command that already ran gets its original ACK, not this.
+      const expired = rejectIfExpired(env, outboundSeq);
+      if (expired) {
+        remember(env.idem_key, expired);
+        sendEnvelope(expired);
+        log(`Expired CMD msg_id=${env.msg_id} (expires_at=${env.expires_at}) — rejected, did not speak`);
         return;
       }
 
