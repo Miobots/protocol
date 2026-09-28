@@ -15,6 +15,12 @@
 import type { HeartbeatPayload, HelloPayload, WelcomePayload } from './sys.ts';
 import type { SpeakPayload } from './voice.ts';
 import type { CapabilityManifestPayload } from './capability.ts';
+import type {
+  NavCancelPayload,
+  NavFeedbackPayload,
+  NavGotoPayload,
+  NavResultPayload,
+} from './nav.ts';
 
 /**
  * The payload each registered topic carries in its own direction — the CMD for a command topic,
@@ -28,6 +34,10 @@ export interface TopicPayloadMap {
   'sys.heartbeat': HeartbeatPayload;
   'cap.manifest': CapabilityManifestPayload;
   'voice.speak': SpeakPayload;
+  'nav.goto': NavGotoPayload;
+  'nav.cancel': NavCancelPayload;
+  'nav.feedback': NavFeedbackPayload;
+  'nav.result': NavResultPayload;
 }
 
 export type RegisteredTopic = keyof TopicPayloadMap;

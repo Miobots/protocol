@@ -11,6 +11,12 @@ export const Topics = {
 
   // Voice Interaction
   VOICE_SPEAK: 'voice.speak',
+
+  // Long-running Navigation
+  NAV_GOTO: 'nav.goto',
+  NAV_CANCEL: 'nav.cancel',
+  NAV_FEEDBACK: 'nav.feedback',
+  NAV_RESULT: 'nav.result',
 } as const;
 
 export type TopicName = (typeof Topics)[keyof typeof Topics];
@@ -18,6 +24,7 @@ export type TopicName = (typeof Topics)[keyof typeof Topics];
 export * from './sys.ts';
 export * from './voice.ts';
 export * from './capability.ts';
+export * from './nav.ts';
 export type * from './registry.ts';
 
 /**
