@@ -1,7 +1,11 @@
 /** Payloads for the long-running navigation lifecycle. */
 
 export interface NavGotoPayload {
-  region: string;
+  /** Provide either a named region or map coordinates (`x` and `y`). */
+  region?: string;
+  x?: number;
+  y?: number;
+  yaw?: number;
   goal_id: string;
 }
 
@@ -10,13 +14,17 @@ export interface NavCancelPayload {
 }
 
 export interface NavFeedbackPayload {
-  goal_id: string;
   distance_remaining_m: number;
+  estimated_time_remaining_s: number;
 }
 
-export type NavResultStatus = 'reached' | 'cancelled' | 'failed';
-
 export interface NavResultPayload {
-  goal_id: string;
-  status: NavResultStatus;
+  success: boolean;
+  total_time_s: number;
+  final_pose: {
+    x: number;
+    y: number;
+    yaw: number;
+  };
+  reason?: string;
 }
