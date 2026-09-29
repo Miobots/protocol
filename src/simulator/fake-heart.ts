@@ -29,6 +29,9 @@ import {
   type HeartbeatPayload,
   type CapabilityManifestPayload,
   type AckPayload,
+  type NavCancelPayload,
+  type NavGotoPayload,
+  type NavResultPayload,
 } from '../index.ts';
 
 const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL;
@@ -58,6 +61,8 @@ interface ActiveNavigation {
   goalId: string;
   corrId: string;
   distanceRemainingM: number;
+  startedAtMs: number;
+  finalPose: NavResultPayload['final_pose'];
 }
 
 let activeNavigation: ActiveNavigation | null = null;
@@ -173,39 +178,71 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isNavGotoPayload(value: unknown): value is { region: string; goal_id: string } {
-  return isRecord(value)
-    && typeof value.region === 'string'
-    && value.region.length > 0
-    && typeof value.goal_id === 'string'
-    && value.goal_id.length > 0;
+export function isNavGotoPayload(value: unknown): value is NavGotoPayload {
+  if (!isRecord(value) || typeof value.goal_id !== 'string' || value.goal_id.length === 0) return false;
+
+  const hasRegion = typeof value.region === 'string' && value.region.length > 0;
+  const hasCoordinates = typeof value.x === 'number'
+    && Number.isFinite(value.x)
+    && typeof value.y === 'number'
+    && Number.isFinite(value.y);
+  const hasValidYaw = value.yaw === undefined || (typeof value.yaw === 'number' && Number.isFinite(value.yaw));
+
+  return (hasRegion || hasCoordinates) && hasValidYaw;
 }
 
-function isNavCancelPayload(value: unknown): value is { goal_id: string } {
+export function navigationPayloadReason(value: unknown): 'invalid_navigation_payload' | undefined {
+  return isNavGotoPayload(value) ? undefined : 'invalid_navigation_payload';
+}
+
+export function isNavCancelPayload(value: unknown): value is NavCancelPayload {
   return isRecord(value) && typeof value.goal_id === 'string' && value.goal_id.length > 0;
 }
 
-function sendNavigationResult(status: 'reached' | 'cancelled' | 'failed'): void {
+export function hasActiveNavigationGoal(navigation: ActiveNavigation | null, goalId: string): boolean {
+  return navigation !== null && navigation.goalId === goalId;
+}
+
+export function navigationCancelReason(
+  navigation: ActiveNavigation | null,
+  goalId: string
+): 'goal_not_found' | undefined {
+  return hasActiveNavigationGoal(navigation, goalId) ? undefined : 'goal_not_found';
+}
+
+function sendNavigationResult(success: boolean, reason?: string): void {
   if (!activeNavigation) return;
 
   const navigation = activeNavigation;
-  const result = newEnvelope<typeof Topics.NAV_RESULT, { goal_id: string; status: typeof status }>({
+  const payload: NavResultPayload = {
+    success,
+    total_time_s: (Date.now() - navigation.startedAtMs) / 1000,
+    final_pose: navigation.finalPose,
+    ...(reason ? { reason } : {}),
+  };
+  const result = newEnvelope({
     kind: Kind.EVT,
     topic: Topics.NAV_RESULT,
     corr_id: navigation.corrId,
     seq: outboundSeq,
-    payload: { goal_id: navigation.goalId, status },
+    payload,
   });
   sendEnvelope(result);
-  log(`Sent nav.result goal_id=${navigation.goalId} status=${status}`);
+  log(`Sent nav.result goal_id=${navigation.goalId} success=${success}`);
   stopNavigation();
 }
 
-function startNavigation(payload: { region: string; goal_id: string }, corrId: string): void {
+function startNavigation(payload: NavGotoPayload, corrId: string): void {
   activeNavigation = {
     goalId: payload.goal_id,
     corrId,
     distanceRemainingM: NAV_START_DISTANCE_M,
+    startedAtMs: Date.now(),
+    finalPose: {
+      x: payload.x ?? 0,
+      y: payload.y ?? 0,
+      yaw: payload.yaw ?? 0,
+    },
   };
 
   navigationTimer = setInterval(() => {
@@ -216,25 +253,25 @@ function startNavigation(payload: { region: string; goal_id: string }, corrId: s
 
     activeNavigation.distanceRemainingM = Math.max(0, activeNavigation.distanceRemainingM - 1);
     const navigation = activeNavigation;
-    const feedback = newEnvelope<typeof Topics.NAV_FEEDBACK, { goal_id: string; distance_remaining_m: number }>({
+    const feedback = newEnvelope({
       kind: Kind.EVT,
       topic: Topics.NAV_FEEDBACK,
       corr_id: navigation.corrId,
       seq: outboundSeq,
       payload: {
-        goal_id: navigation.goalId,
         distance_remaining_m: navigation.distanceRemainingM,
+        estimated_time_remaining_s: navigation.distanceRemainingM,
       },
     });
     sendEnvelope(feedback);
     log(`Sent nav.feedback goal_id=${navigation.goalId} distance_remaining_m=${navigation.distanceRemainingM}`);
 
     if (navigation.distanceRemainingM === 0) {
-      sendNavigationResult('reached');
+      sendNavigationResult(true);
     }
   }, NAV_TICK_MS);
 
-  log(`Accepted nav.goto goal_id=${payload.goal_id} region=${payload.region}`);
+  log(`Accepted nav.goto goal_id=${payload.goal_id}`);
 }
 
 function startHeartbeat(): void {
@@ -383,7 +420,11 @@ export function connect(): void {
       if (!isNavGotoPayload(env.payload)) {
         const invalid = createAck(
           env,
-          { accepted: false, reason: 'invalid_navigation_payload', exec_status: ExecutionStatus.REJECTED },
+          {
+            accepted: false,
+            reason: navigationPayloadReason(env.payload),
+            exec_status: ExecutionStatus.REJECTED,
+          },
           outboundSeq,
         );
         remember(env.idem_key, invalid);
@@ -413,7 +454,11 @@ export function connect(): void {
         );
         log(`nav.goto received -> REJECTED (navigation_goal_active, ${activeNavigation.goalId})`);
       } else {
-        ack = createAck(env, { accepted: true, exec_status: ExecutionStatus.QUEUED }, outboundSeq);
+        ack = createAck(
+          env,
+          { accepted: true, exec_status: ExecutionStatus.EXECUTING, goal_id: env.payload.goal_id },
+          outboundSeq,
+        );
         startNavigation(env.payload, env.corr_id);
       }
 
@@ -449,10 +494,11 @@ export function connect(): void {
         return;
       }
 
-      if (!activeNavigation || activeNavigation.goalId !== env.payload.goal_id) {
+      const cancelReason = navigationCancelReason(activeNavigation, env.payload.goal_id);
+      if (cancelReason) {
         const missing = createAck(
           env,
-          { accepted: false, reason: 'goal_not_found', exec_status: ExecutionStatus.REJECTED },
+          { accepted: false, reason: cancelReason, exec_status: ExecutionStatus.REJECTED },
           outboundSeq,
         );
         remember(env.idem_key, missing);
@@ -465,7 +511,7 @@ export function connect(): void {
       remember(env.idem_key, accepted);
       sendEnvelope(accepted);
       log(`nav.cancel received -> ACCEPTED (${env.payload.goal_id})`);
-      sendNavigationResult('cancelled');
+      sendNavigationResult(false, 'cancelled');
       return;
     }
 
@@ -517,6 +563,7 @@ export function connect(): void {
 
   ws.on('close', (code, reason) => {
     cleanupTimers();
+    // A disconnected active goal is discarded; this simulator has no outbox for a later result.
     stopNavigation();
     log(`Connection closed (${code} - ${reason.toString() || 'no reason'}).`);
     scheduleReconnect();

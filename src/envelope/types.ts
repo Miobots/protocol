@@ -57,6 +57,9 @@ export interface AckPayload {
   /** Execution status indication. */
   exec_status?: ExecutionStatus;
 
+  /** Navigation goal identifier when an ACK accepts a navigation command. */
+  goal_id?: string;
+
   /** Additional structured diagnostic details. */
   details?: Record<string, unknown>;
 }

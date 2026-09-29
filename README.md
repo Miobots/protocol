@@ -92,4 +92,9 @@ elsewhere stops only the wrapper, and the simulator keeps running underneath.
 | `DEV_TOKEN` | `mio-dev-secret-token` | Token sent in `sys.hello` |
 | `DEVICE_ID` | `heart-sim-01` | Device id sent in `sys.hello` |
 | `FAKE_HEART_DOCKING_UNAVAILABLE` | unset | `true` publishes docking as `unavailable` |
+| `FAKE_HEART_REFUSE_NAV` | unset | `true` refuses `nav.goto` with a low-battery reason |
+
+Navigation cancellation matches the active goal by `goal_id`. Coordinate goals provide `x` and
+`y`, with optional `yaw`; named goals provide `region`. Navigation feedback reports remaining
+distance and estimated time, while terminal results report success, elapsed time, and final pose.
 
