@@ -21,10 +21,11 @@ import type {
   NavGotoPayload,
   NavResultPayload,
 } from './nav.ts';
+import type { BatteryPayload, PosePayload } from './state.ts';
 
 /**
  * The payload each registered topic carries in its own direction — the CMD for a command topic,
- * the EVT for an event topic, the RPY for a query.
+ * the EVT for an event topic, the TELEM for a reading, the RPY for a query.
  *
  * Keys are literals rather than `typeof Topics.X` so that this stays a type-only module.
  */
@@ -38,6 +39,8 @@ export interface TopicPayloadMap {
   'nav.cancel': NavCancelPayload;
   'nav.feedback': NavFeedbackPayload;
   'nav.result': NavResultPayload;
+  'state.pose': PosePayload;
+  'state.battery': BatteryPayload;
 }
 
 export type RegisteredTopic = keyof TopicPayloadMap;
