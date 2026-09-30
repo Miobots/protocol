@@ -4,6 +4,18 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-09-30 — Fake Heart navigation lifecycle (M-69)
+
+### Added
+
+- Validated `nav.goto` and `nav.cancel` payloads against the shared protocol types.
+- Added navigation refusal, malformed-payload, and unknown-goal cancellation handling.
+- Documented `FAKE_HEART_REFUSE_NAV` and goal-based cancellation.
+
+### Changed
+
+- Navigation feedback and terminal results now use the canonical payload shapes from the conformance vectors.
+
 ## 2026-09-30 — Navigation payload parity (P2.1)
 
 ### Changed

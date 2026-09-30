@@ -1,8 +1,8 @@
 /**
  * Canonical Fake Heart Simulator.
  * Dials out to Brain over WebSocket, authenticates with dev token, exchanges bidirectional heartbeats,
- * and handles speech commands.
- * Run with: bun run src/simulator/fake-heart.ts
+ * and handles speech and navigation commands.
+ * Run with: bun run src/simulator/fake-heart.ts [--refuse-nav]
  */
 
 import { WebSocket } from 'ws';
@@ -29,17 +29,25 @@ import {
   type HeartbeatPayload,
   type CapabilityManifestPayload,
   type AckPayload,
+  type NavCancelPayload,
+  type NavGotoPayload,
+  type NavResultPayload,
 } from '../index.ts';
 
 const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL;
 const DEV_TOKEN = process.env['DEV_TOKEN'] || ProtocolDefaults.DEFAULT_DEV_TOKEN;
 const DEVICE_ID = process.env['DEVICE_ID'] || ProtocolDefaults.DEFAULT_FAKE_HEART_ID;
 const DOCKING_UNAVAILABLE = process.env['FAKE_HEART_DOCKING_UNAVAILABLE'] === 'true';
+const REFUSE_NAV = process.env['FAKE_HEART_REFUSE_NAV'] === 'true' || process.argv.includes('--refuse-nav');
+const REFUSAL_BATTERY_PCT = 16;
+const NAV_TICK_MS = 500;
+const NAV_START_DISTANCE_M = 5;
 
 let ws: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let capabilityTimer: NodeJS.Timeout | null = null;
+let navigationTimer: NodeJS.Timeout | null = null;
 let backoffDelayMs: number = ProtocolDefaults.RECONNECT_INITIAL_DELAY_MS;
 const MAX_BACKOFF_MS = ProtocolDefaults.RECONNECT_MAX_DELAY_MS;
 const BACKOFF_MULTIPLIER = ProtocolDefaults.RECONNECT_BACKOFF_MULTIPLIER;
@@ -48,6 +56,16 @@ let isShuttingDown = false;
 // Per-connection outbound sequence counter
 let outboundSeq = new SequenceCounter();
 let lastHeartbeatReceivedMs = 0;
+
+interface ActiveNavigation {
+  goalId: string;
+  corrId: string;
+  distanceRemainingM: number;
+  startedAtMs: number;
+  finalPose: NavResultPayload['final_pose'];
+}
+
+let activeNavigation: ActiveNavigation | null = null;
 
 function log(message: string): void {
   const time = new Date().toISOString().substring(11, 23);
@@ -146,6 +164,114 @@ function cleanupTimers(): void {
     clearInterval(capabilityTimer);
     capabilityTimer = null;
   }
+}
+
+function stopNavigation(): void {
+  if (navigationTimer) {
+    clearInterval(navigationTimer);
+    navigationTimer = null;
+  }
+  activeNavigation = null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isNavGotoPayload(value: unknown): value is NavGotoPayload {
+  if (!isRecord(value) || typeof value.goal_id !== 'string' || value.goal_id.length === 0) return false;
+
+  const hasRegion = typeof value.region === 'string' && value.region.length > 0;
+  const hasCoordinates = typeof value.x === 'number'
+    && Number.isFinite(value.x)
+    && typeof value.y === 'number'
+    && Number.isFinite(value.y);
+  const hasValidYaw = value.yaw === undefined || (typeof value.yaw === 'number' && Number.isFinite(value.yaw));
+
+  return (hasRegion || hasCoordinates) && hasValidYaw;
+}
+
+export function navigationPayloadReason(value: unknown): 'invalid_navigation_payload' | undefined {
+  return isNavGotoPayload(value) ? undefined : 'invalid_navigation_payload';
+}
+
+export function isNavCancelPayload(value: unknown): value is NavCancelPayload {
+  return isRecord(value) && typeof value.goal_id === 'string' && value.goal_id.length > 0;
+}
+
+export function hasActiveNavigationGoal(navigation: ActiveNavigation | null, goalId: string): boolean {
+  return navigation !== null && navigation.goalId === goalId;
+}
+
+export function navigationCancelReason(
+  navigation: ActiveNavigation | null,
+  goalId: string
+): 'goal_not_found' | undefined {
+  return hasActiveNavigationGoal(navigation, goalId) ? undefined : 'goal_not_found';
+}
+
+function sendNavigationResult(success: boolean, reason?: string): void {
+  if (!activeNavigation) return;
+
+  const navigation = activeNavigation;
+  const payload: NavResultPayload = {
+    success,
+    total_time_s: (Date.now() - navigation.startedAtMs) / 1000,
+    final_pose: navigation.finalPose,
+    ...(reason ? { reason } : {}),
+  };
+  const result = newEnvelope({
+    kind: Kind.EVT,
+    topic: Topics.NAV_RESULT,
+    corr_id: navigation.corrId,
+    seq: outboundSeq,
+    payload,
+  });
+  sendEnvelope(result);
+  log(`Sent nav.result goal_id=${navigation.goalId} success=${success}`);
+  stopNavigation();
+}
+
+function startNavigation(payload: NavGotoPayload, corrId: string): void {
+  activeNavigation = {
+    goalId: payload.goal_id,
+    corrId,
+    distanceRemainingM: NAV_START_DISTANCE_M,
+    startedAtMs: Date.now(),
+    finalPose: {
+      x: payload.x ?? 0,
+      y: payload.y ?? 0,
+      yaw: payload.yaw ?? 0,
+    },
+  };
+
+  navigationTimer = setInterval(() => {
+    if (!activeNavigation || !ws || ws.readyState !== WebSocket.OPEN) {
+      stopNavigation();
+      return;
+    }
+
+    activeNavigation.distanceRemainingM = Math.max(0, activeNavigation.distanceRemainingM - 1);
+    const navigation = activeNavigation;
+    const feedback = newEnvelope({
+      kind: Kind.EVT,
+      topic: Topics.NAV_FEEDBACK,
+      corr_id: navigation.corrId,
+      seq: outboundSeq,
+      payload: {
+        distance_remaining_m: navigation.distanceRemainingM,
+        estimated_time_remaining_s: navigation.distanceRemainingM,
+      },
+    });
+    sendEnvelope(feedback);
+    log(`Sent nav.feedback goal_id=${navigation.goalId} distance_remaining_m=${navigation.distanceRemainingM}`);
+
+    if (navigation.distanceRemainingM === 0) {
+      sendNavigationResult(true);
+    }
+  }, NAV_TICK_MS);
+
+  log(`Accepted nav.goto goal_id=${payload.goal_id}`);
 }
 
 function startHeartbeat(): void {
@@ -275,6 +401,120 @@ export function connect(): void {
       return;
     }
 
+    if (env.topic === Topics.NAV_GOTO && env.kind === Kind.CMD) {
+      const replayed = replayIfSeen(env.idem_key);
+      if (replayed) {
+        sendEnvelope(replayed);
+        log(`Duplicate idem_key=${env.idem_key} — replayed nav.goto ACK`);
+        return;
+      }
+
+      const expired = rejectIfExpired(env, outboundSeq);
+      if (expired) {
+        remember(env.idem_key, expired);
+        sendEnvelope(expired);
+        log(`Expired nav.goto msg_id=${env.msg_id} — rejected`);
+        return;
+      }
+
+      if (!isNavGotoPayload(env.payload)) {
+        const invalid = createAck(
+          env,
+          {
+            accepted: false,
+            reason: navigationPayloadReason(env.payload),
+            exec_status: ExecutionStatus.REJECTED,
+          },
+          outboundSeq,
+        );
+        remember(env.idem_key, invalid);
+        sendEnvelope(invalid);
+        log('nav.goto received -> REJECTED (invalid_navigation_payload)');
+        return;
+      }
+
+      let ack: Envelope<string, AckPayload>;
+      if (REFUSE_NAV) {
+        ack = createAck(
+          env,
+          {
+            accepted: false,
+            reason: 'battery_below_return_margin',
+            exec_status: ExecutionStatus.REJECTED,
+            details: { battery_pct: REFUSAL_BATTERY_PCT },
+          },
+          outboundSeq,
+        );
+        log(`nav.goto received -> REJECTED (battery_below_return_margin, ${REFUSAL_BATTERY_PCT}%)`);
+      } else if (activeNavigation) {
+        ack = createAck(
+          env,
+          { accepted: false, reason: 'navigation_goal_active', exec_status: ExecutionStatus.REJECTED },
+          outboundSeq,
+        );
+        log(`nav.goto received -> REJECTED (navigation_goal_active, ${activeNavigation.goalId})`);
+      } else {
+        ack = createAck(
+          env,
+          { accepted: true, exec_status: ExecutionStatus.EXECUTING, goal_id: env.payload.goal_id },
+          outboundSeq,
+        );
+        startNavigation(env.payload, env.corr_id);
+      }
+
+      remember(env.idem_key, ack);
+      sendEnvelope(ack);
+      return;
+    }
+
+    if (env.topic === Topics.NAV_CANCEL && env.kind === Kind.CMD) {
+      const replayed = replayIfSeen(env.idem_key);
+      if (replayed) {
+        sendEnvelope(replayed);
+        log(`Duplicate idem_key=${env.idem_key} — replayed nav.cancel ACK`);
+        return;
+      }
+
+      const expired = rejectIfExpired(env, outboundSeq);
+      if (expired) {
+        remember(env.idem_key, expired);
+        sendEnvelope(expired);
+        log(`Expired nav.cancel msg_id=${env.msg_id} — rejected`);
+        return;
+      }
+
+      if (!isNavCancelPayload(env.payload)) {
+        const invalid = createAck(
+          env,
+          { accepted: false, reason: 'invalid_navigation_payload', exec_status: ExecutionStatus.REJECTED },
+          outboundSeq,
+        );
+        remember(env.idem_key, invalid);
+        sendEnvelope(invalid);
+        return;
+      }
+
+      const cancelReason = navigationCancelReason(activeNavigation, env.payload.goal_id);
+      if (cancelReason) {
+        const missing = createAck(
+          env,
+          { accepted: false, reason: cancelReason, exec_status: ExecutionStatus.REJECTED },
+          outboundSeq,
+        );
+        remember(env.idem_key, missing);
+        sendEnvelope(missing);
+        log(`nav.cancel received -> REJECTED (goal_not_found, ${env.payload.goal_id})`);
+        return;
+      }
+
+      const accepted = createAck(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED }, outboundSeq);
+      remember(env.idem_key, accepted);
+      sendEnvelope(accepted);
+      log(`nav.cancel received -> ACCEPTED (${env.payload.goal_id})`);
+      sendNavigationResult(false, 'cancelled');
+      return;
+    }
+
     // Handle voice.speak command
     if (env.topic === Topics.VOICE_SPEAK && env.kind === Kind.CMD) {
       // Replay before executing. ENVELOPE.md §5: "Every CMD carries an idem_key and is never
@@ -323,6 +563,8 @@ export function connect(): void {
 
   ws.on('close', (code, reason) => {
     cleanupTimers();
+    // A disconnected active goal is discarded; this simulator has no outbox for a later result.
+    stopNavigation();
     log(`Connection closed (${code} - ${reason.toString() || 'no reason'}).`);
     scheduleReconnect();
   });
@@ -348,6 +590,7 @@ export function scheduleReconnect(): void {
 export function shutdown(): void {
   isShuttingDown = true;
   cleanupTimers();
+  stopNavigation();
   log('Shutting down Fake Heart simulator...');
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (ws) ws.close();
