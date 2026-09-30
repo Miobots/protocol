@@ -131,6 +131,44 @@ describe('Topic → payload binding (P0.3)', () => {
     assert.ok(true);
   });
 
+  it('binds the navigation lifecycle payloads to their topics', () => {
+    const conn = new SequenceCounter();
+
+    newEnvelope({
+      kind: Kind.CMD,
+      topic: Topics.NAV_GOTO,
+      payload: { x: 3.2, y: -1.1, yaw: 1.57, goal_id: 'g-88' },
+      seq: conn,
+    });
+    newEnvelope({
+      kind: Kind.CMD,
+      topic: Topics.NAV_CANCEL,
+      payload: { goal_id: 'g-88' },
+      seq: conn,
+    });
+    newEnvelope({
+      kind: Kind.EVT,
+      topic: Topics.NAV_FEEDBACK,
+      payload: { distance_remaining_m: 2.1, estimated_time_remaining_s: 8.5 },
+      seq: conn,
+    });
+    newEnvelope({
+      kind: Kind.EVT,
+      topic: Topics.NAV_RESULT,
+      payload: {
+        success: true,
+        total_time_s: 8.879,
+        final_pose: { x: 3.19, y: -1.08, yaw: 1.56 },
+      },
+      seq: conn,
+    });
+
+    // @ts-expect-error — cancelling navigation requires the goal being cancelled.
+    newEnvelope({ kind: Kind.CMD, topic: Topics.NAV_CANCEL, payload: {}, seq: conn });
+
+    assert.ok(true);
+  });
+
   it('accepts the topic\'s own payload, and an ACK replying on that topic', () => {
     const conn = new SequenceCounter();
 

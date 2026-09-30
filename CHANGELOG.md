@@ -4,6 +4,14 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-09-30 — Navigation payload parity (P2.1)
+
+### Changed
+
+- Aligned navigation payload types with the canonical conformance vectors, including coordinate
+  goals, estimated feedback time, final pose results, and optional failure reasons.
+- Added compile-time coverage for the four navigation topics and goal-based cancellation.
+
 ## 2026-09-27 — Receiver-side expiry in the Fake Heart (B0.5) · #11
 
 The Fake Heart ACKed `accepted: true` however late a command arrived. The codec's check compares
