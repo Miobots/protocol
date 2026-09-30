@@ -4,6 +4,14 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-10-01 — Telemetry topics (P2.4)
+
+### Added
+
+- `state.pose` and `state.battery` topics with payloads matching the conformance vectors.
+- `TopicKind` — every topic's kind from ENVELOPE.md §10; an unclassified topic fails to compile.
+- `queuesInOutbox(kind)` — only `EVT` waits in the outbox; telemetry is dropped.
+
 ## 2026-09-30 — Fake Heart navigation lifecycle (M-69)
 
 ### Added
