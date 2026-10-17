@@ -38,10 +38,21 @@ const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL
 const DEV_TOKEN = process.env['DEV_TOKEN'] || ProtocolDefaults.DEFAULT_DEV_TOKEN;
 const DEVICE_ID = process.env['DEVICE_ID'] || ProtocolDefaults.DEFAULT_FAKE_HEART_ID;
 const DOCKING_UNAVAILABLE = process.env['FAKE_HEART_DOCKING_UNAVAILABLE'] === 'true';
-const REFUSE_NAV = process.env['FAKE_HEART_REFUSE_NAV'] === 'true' || process.argv.includes('--refuse-nav');
+// `let`: typing `r` + Enter in the simulator's terminal flips it, so a demo can show a drive and a
+// refusal in one run instead of restarting with the flag.
+let refuseNav = process.env['FAKE_HEART_REFUSE_NAV'] === 'true' || process.argv.includes('--refuse-nav');
 const REFUSAL_BATTERY_PCT = 16;
 const NAV_TICK_MS = 500;
-const NAV_START_DISTANCE_M = 5;
+
+/**
+ * Metres a goal starts from, one per tick. The default 5 m finishes in 2.5 s — fine for tests, too
+ * short to say "stop" in. `FAKE_HEART_NAV_DISTANCE_M=30` gives a 15 s drive.
+ */
+export function parseNavDistance(raw: string | undefined): number {
+  const metres = Number(raw);
+  return Number.isFinite(metres) && metres > 0 ? metres : 5;
+}
+const NAV_START_DISTANCE_M = parseNavDistance(process.env['FAKE_HEART_NAV_DISTANCE_M']);
 
 let ws: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
@@ -315,35 +326,40 @@ function startHeartbeat(): void {
 }
 
 function sendCapabilities(): void {
-  capabilityTimer = setInterval(() => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      cleanupTimers();
-      return;
-    }
+  // Publish at once, then every 10 s. Waiting for the first tick left the Brain with no robot half
+  // for 10 s after connecting, and its agent turned down "go to the kitchen" as "can't drive".
+  publishCapabilities();
+  capabilityTimer = setInterval(publishCapabilities, ProtocolDefaults.CAP_MANIFEST_INTERVAL_MS);
+}
 
-    const capabilityEnv = newEnvelope<typeof Topics.CAP_MANIFEST, CapabilityManifestPayload>({
-      kind: Kind.EVT,
-      topic: Topics.CAP_MANIFEST,
-      seq: outboundSeq,
-      payload: {
-        // The robot's half only (TASKS.md S1.2). IDs come from the shared registry so that the
-        // publisher and whatever renders it cannot drift apart.
-        capabilities: {
-          [HeartCapabilities.DRIVING]: { state: 'available' },
-          [HeartCapabilities.DOCKING]: DOCKING_UNAVAILABLE
-            ? { state: 'unavailable', reason: 'no dock in the map yet' }
-            : { state: 'available' },
-          [HeartCapabilities.RECORDING]: { state: 'available' },
-          [HeartCapabilities.LOCAL_VOICE]: {
-            state: 'degraded',
-            note: 'offline — simple phrasing only',
-          },
-          [HeartCapabilities.ROBOT_HEALTH]: { state: 'available' },
+function publishCapabilities(): void {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    cleanupTimers();
+    return;
+  }
+
+  const capabilityEnv = newEnvelope<typeof Topics.CAP_MANIFEST, CapabilityManifestPayload>({
+    kind: Kind.EVT,
+    topic: Topics.CAP_MANIFEST,
+    seq: outboundSeq,
+    payload: {
+      // The robot's half only (TASKS.md S1.2). IDs come from the shared registry so that the
+      // publisher and whatever renders it cannot drift apart.
+      capabilities: {
+        [HeartCapabilities.DRIVING]: { state: 'available' },
+        [HeartCapabilities.DOCKING]: DOCKING_UNAVAILABLE
+          ? { state: 'unavailable', reason: 'no dock in the map yet' }
+          : { state: 'available' },
+        [HeartCapabilities.RECORDING]: { state: 'available' },
+        [HeartCapabilities.LOCAL_VOICE]: {
+          state: 'degraded',
+          note: 'offline — simple phrasing only',
         },
+        [HeartCapabilities.ROBOT_HEALTH]: { state: 'available' },
       },
-    });
-    sendEnvelope(capabilityEnv);
-  }, ProtocolDefaults.CAP_MANIFEST_INTERVAL_MS);
+    },
+  });
+  sendEnvelope(capabilityEnv);
 }
 
 export function connect(): void {
@@ -434,7 +450,7 @@ export function connect(): void {
       }
 
       let ack: Envelope<string, AckPayload>;
-      if (REFUSE_NAV) {
+      if (refuseNav) {
         ack = createAck(
           env,
           {
@@ -601,5 +617,14 @@ process.on('SIGTERM', shutdown);
 
 // Auto-start only when executed directly
 if (import.meta.main) {
+  log(`Drives start ${NAV_START_DISTANCE_M} m out. Refusal is ${refuseNav ? 'ON' : 'OFF'} — type r + Enter to toggle.`);
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (line: string) => {
+    if (line.trim().toLowerCase() !== 'r') return;
+    refuseNav = !refuseNav;
+    log(refuseNav
+      ? `Refusal ON — nav.goto will be rejected (battery ${REFUSAL_BATTERY_PCT}%)`
+      : 'Refusal OFF — nav.goto will be accepted');
+  });
   connect();
 }

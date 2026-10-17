@@ -92,7 +92,8 @@ elsewhere stops only the wrapper, and the simulator keeps running underneath.
 | `DEV_TOKEN` | `mio-dev-secret-token` | Token sent in `sys.hello` |
 | `DEVICE_ID` | `heart-sim-01` | Device id sent in `sys.hello` |
 | `FAKE_HEART_DOCKING_UNAVAILABLE` | unset | `true` publishes docking as `unavailable` |
-| `FAKE_HEART_REFUSE_NAV` | unset | `true` refuses `nav.goto` with a low-battery reason |
+| `FAKE_HEART_REFUSE_NAV` | unset | `true` refuses `nav.goto` with a low-battery reason. **Type `r` + Enter in the simulator's terminal to toggle it while running** |
+| `FAKE_HEART_NAV_DISTANCE_M` | `5` | Metres a drive starts from, one per 0.5 s tick. `30` gives a 15 s drive — long enough to say "stop" |
 
 Navigation cancellation matches the active goal by `goal_id`. Coordinate goals provide `x` and
 `y`, with optional `yaw`; named goals provide `region`. Navigation feedback reports remaining
