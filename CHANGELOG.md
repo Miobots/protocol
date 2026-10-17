@@ -4,6 +4,17 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 
 ---
 
+## 2026-10-17 — Fake Heart controls for the I3 demo (B2.5)
+
+### Added
+
+- `FAKE_HEART_NAV_DISTANCE_M` — drive length; the default 5 m finishes in 2.5 s, before a "stop" can arrive.
+- Typing `r` + Enter in the simulator's terminal toggles the `nav.goto` refusal, so a drive and a refusal fit in one run.
+
+### Fixed
+
+- The robot's half of `cap.manifest` is published on connect, not 10 s later. Until then the Brain's situation block (B2.3) said the robot had reported nothing, and the agent declined to drive.
+
 ## 2026-10-01 — Telemetry topics (P2.4)
 
 ### Added

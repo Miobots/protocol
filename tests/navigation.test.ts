@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   navigationPayloadReason,
   navigationCancelReason,
+  parseNavDistance,
 } from '../src/simulator/fake-heart.ts';
 import type { NavResultPayload } from '../src/index.ts';
 
@@ -28,5 +29,11 @@ describe('Fake Heart navigation payload validation', () => {
     };
 
     assert.equal(navigationCancelReason(active, 'g-99'), 'goal_not_found');
+  });
+});
+describe('Fake Heart drive length (FAKE_HEART_NAV_DISTANCE_M)', () => {
+  it('uses the configured distance and falls back to 5 m on anything unusable', () => {
+    assert.equal(parseNavDistance('30'), 30);
+    for (const bad of [undefined, '', 'abc', '0', '-3']) assert.equal(parseNavDistance(bad), 5);
   });
 });
