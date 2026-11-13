@@ -2,6 +2,15 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-13 — MCP protocol foundation (Phase 2A)
+
+### Added
+
+- `mcp.request`, `mcp.response`, and `mcp.notification` envelope topics.
+- Typed JSON-RPC 2.0 request, response, error, and notification payloads.
+- Bounded runtime validation for MCP JSON values, nesting, collections, IDs, methods, params, and response shape.
+- Registered topic/kind validation and full-envelope UTF-8 size enforcement in the existing codec.
+
 ---
 
 ## 2026-10-17 — Fake Heart controls for the I3 demo (B2.5)

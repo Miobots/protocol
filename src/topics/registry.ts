@@ -22,6 +22,7 @@ import type {
   NavResultPayload,
 } from './nav.ts';
 import type { BatteryPayload, PosePayload } from './state.ts';
+import type { MCPNotificationPayload, MCPRequestPayload, MCPResponsePayload } from './mcp.ts';
 
 /**
  * The payload each registered topic carries in its own direction — the CMD for a command topic,
@@ -41,6 +42,9 @@ export interface TopicPayloadMap {
   'nav.result': NavResultPayload;
   'state.pose': PosePayload;
   'state.battery': BatteryPayload;
+  'mcp.request': MCPRequestPayload;
+  'mcp.response': MCPResponsePayload;
+  'mcp.notification': MCPNotificationPayload;
 }
 
 export type RegisteredTopic = keyof TopicPayloadMap;
