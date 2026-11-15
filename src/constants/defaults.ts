@@ -33,9 +33,9 @@ export const ProtocolDefaults = {
   // instead of executing twice (ENVELOPE.md §5). Both sides derive from this; nobody re-declares it.
   IDEMPOTENCY_TTL_MS: 600000,
 
-  // Payload & Message Size Constraints (64 KB)
-  MAX_PAYLOAD_BYTES: 65536,
-  MAX_MESSAGE_BYTES: 65536,
+  // Payload & Message Size Constraints (512 KB)
+  MAX_PAYLOAD_BYTES: 512 * 1024,
+  MAX_MESSAGE_BYTES: 512 * 1024,
 
   // ULID Configuration
   ULID_TIME_LEN: 10,
