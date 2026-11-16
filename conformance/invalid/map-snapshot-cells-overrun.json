@@ -1,0 +1,30 @@
+{
+  "description": "map.snapshot whose runs describe more cells than width x height",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C4",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C4",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "TELEM",
+    "topic": "map.snapshot",
+    "seq": 500,
+    "payload": {
+      "width": 4,
+      "height": 3,
+      "resolution": 0.05,
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "cells": [
+        0,
+        4000000000
+      ]
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}

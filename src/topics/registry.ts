@@ -12,7 +12,15 @@
  * assertion at the bottom of `./index.ts`.
  */
 
-import type { HeartbeatPayload, HelloPayload, WelcomePayload } from './sys.ts';
+import type {
+  ApprovalPayload,
+  ErrorPayload,
+  HeartbeatPayload,
+  HelloPayload,
+  KillSwitchPayload,
+  ReceiptPayload,
+  WelcomePayload,
+} from './sys.ts';
 import type { SpeakPayload } from './voice.ts';
 import type { CapabilityManifestPayload } from './capability.ts';
 import type {
@@ -22,6 +30,10 @@ import type {
   NavResultPayload,
 } from './nav.ts';
 import type { BatteryPayload, PosePayload } from './state.ts';
+import type { SchedFiredPayload, SchedWindowPayload } from './sched.ts';
+import type { SightingPayload } from './obs.ts';
+import type { FaultPayload } from './diag.ts';
+import type { MapSnapshotPayload, RegionConfirmPayload, RegionPayload, ZonePayload } from './map.ts';
 import type { MCPNotificationPayload, MCPRequestPayload, MCPResponsePayload } from './mcp.ts';
 
 /**
@@ -34,7 +46,11 @@ export interface TopicPayloadMap {
   'sys.hello': HelloPayload;
   'sys.welcome': WelcomePayload;
   'sys.heartbeat': HeartbeatPayload;
+  'sys.error': ErrorPayload;
+  'sys.receipt': ReceiptPayload;
   'cap.manifest': CapabilityManifestPayload;
+  'sys.approval': ApprovalPayload;
+  'sys.killswitch': KillSwitchPayload;
   'voice.speak': SpeakPayload;
   'nav.goto': NavGotoPayload;
   'nav.cancel': NavCancelPayload;
@@ -42,6 +58,14 @@ export interface TopicPayloadMap {
   'nav.result': NavResultPayload;
   'state.pose': PosePayload;
   'state.battery': BatteryPayload;
+  'sched.window': SchedWindowPayload;
+  'sched.fired': SchedFiredPayload;
+  'obs.sighting': SightingPayload;
+  'diag.fault': FaultPayload;
+  'map.snapshot': MapSnapshotPayload;
+  'region.upsert': RegionPayload;
+  'region.confirm': RegionConfirmPayload;
+  'zone.upsert': ZonePayload;
   'mcp.request': MCPRequestPayload;
   'mcp.response': MCPResponsePayload;
   'mcp.notification': MCPNotificationPayload;

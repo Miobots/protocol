@@ -1,0 +1,33 @@
+{
+  "description": "region.upsert whose polygon has only two corners",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C5",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C5",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "region.upsert",
+    "seq": 500,
+    "idem_key": "region-01J6G7M8N9P0Q1R2S3T4U5V7C5",
+    "payload": {
+      "region_id": "kitchen",
+      "name_en": "Kitchen",
+      "polygon": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "confirmed": true
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}

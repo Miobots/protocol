@@ -1,0 +1,27 @@
+{
+  "description": "sched.window with an occurrence missing due_time_ms",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C2",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C2",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "sched.window",
+    "seq": 500,
+    "idem_key": "sched-01J6G7M8N9P0Q1R2S3T4U5V7C2",
+    "payload": {
+      "occurrences": [
+        {
+          "occurrence_id": "oc-11",
+          "reminder_id": "r-3",
+          "text": "meeting in 10 minutes"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}

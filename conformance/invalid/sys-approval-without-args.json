@@ -1,0 +1,23 @@
+{
+  "description": "sys.approval that does not show its arguments",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C7",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C7",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "sys.approval",
+    "seq": 500,
+    "idem_key": "approval-ap-19",
+    "payload": {
+      "approval_id": "ap-19",
+      "tool_name": "open_app_or_url",
+      "expires_at": 1786412466000
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}
