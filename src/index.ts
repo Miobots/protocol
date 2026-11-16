@@ -7,3 +7,4 @@ export * from './constants/index.ts';
 export * from './envelope/index.ts';
 export * from './codec/index.ts';
 export * from './topics/index.ts';
+export * from './teleop/index.ts';
