@@ -13,7 +13,8 @@
     "start": "bun run src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "sim": "bun run src/simulator/fake-heart.ts"
+    "sim": "bun run src/simulator/fake-heart.ts",
+    "bench": "bun run bench/codec.bench.ts"
   },
   "dependencies": {
     "ws": "^8.18.0"
