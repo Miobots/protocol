@@ -4,6 +4,13 @@
 
 import { Kind, ProtocolErrorCode, ProtocolErrorReason, ProtocolDefaults } from '../constants/index.ts';
 import { ProtocolError, type Envelope } from '../envelope/types.ts';
+import {
+  TopicAllowedKinds,
+  Topics,
+  validateMCPNotification,
+  validateMCPRequest,
+  validateMCPResponse,
+} from '../topics/index.ts';
 
 const VALID_KINDS = new Set<string>(Object.values(Kind));
 const DIGITS_ONLY = /^\d+$/;
@@ -41,11 +48,17 @@ export function decodeUtf8(bytes: Uint8Array): string {
  */
 export function encode<TTopic extends string, TPayload>(envelope: Envelope<TTopic, TPayload>): string {
   try {
-    return JSON.stringify(envelope);
+    const encoded = JSON.stringify(envelope);
+    if (getUtf8ByteLength(encoded) > ProtocolDefaults.MAX_MESSAGE_BYTES) {
+      throw new ProtocolError('Wire message exceeds maximum size limit', ProtocolErrorCode.ERR_PAYLOAD_TOO_LARGE, {
+        reason: ProtocolErrorReason.OVERSIZED_PAYLOAD,
+      });
+    }
+    return encoded;
   } catch (err) {
+    if (err instanceof ProtocolError) throw err;
     throw new ProtocolError('Failed to serialize envelope to JSON', ProtocolErrorCode.ERR_ENCODE_FAILED, {
       reason: ProtocolErrorReason.INVALID_ENVELOPE,
-      details: err,
     });
   }
 }
@@ -63,6 +76,20 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
   }
 
   const candidate = obj as Record<string, unknown>;
+
+  let encodedEnvelope: string;
+  try {
+    encodedEnvelope = JSON.stringify(candidate);
+  } catch {
+    throw new ProtocolError('Envelope contains non-serializable data', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.INVALID_ENVELOPE,
+    });
+  }
+  if (getUtf8ByteLength(encodedEnvelope) > ProtocolDefaults.MAX_MESSAGE_BYTES) {
+    throw new ProtocolError('Wire message exceeds maximum size limit', ProtocolErrorCode.ERR_PAYLOAD_TOO_LARGE, {
+      reason: ProtocolErrorReason.OVERSIZED_PAYLOAD,
+    });
+  }
 
   if (typeof candidate['msg_id'] !== 'string' || candidate['msg_id'].length === 0) {
     throw new ProtocolError('Field "msg_id" must be a non-empty string', ProtocolErrorCode.ERR_INVALID_MSG_ID, {
@@ -122,6 +149,16 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     });
   }
 
+  const topic = candidate['topic'];
+  const kind = candidate['kind'];
+  const allowedKinds = TopicAllowedKinds[topic as keyof typeof TopicAllowedKinds];
+  if (allowedKinds && kind !== Kind.ACK && !allowedKinds.includes(kind as Kind)) {
+    throw new ProtocolError('Envelope kind is not valid for this topic', ProtocolErrorCode.ERR_INVALID_TOPIC, {
+      reason: ProtocolErrorReason.INVALID_ENVELOPE,
+      field: 'kind',
+    });
+  }
+
   if (
     typeof candidate['seq'] !== 'number' ||
     !Number.isInteger(candidate['seq']) ||
@@ -156,6 +193,30 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     }
   } catch (err) {
     if (err instanceof ProtocolError) throw err;
+    throw new ProtocolError('Payload is not valid JSON data', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.INVALID_ENVELOPE,
+      field: 'payload',
+    });
+  }
+
+  if (topic === Topics.MCP_REQUEST && kind === Kind.CMD && !validateMCPRequest(candidate['payload'])) {
+    throw new ProtocolError('Invalid MCP request payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.MALFORMED,
+      field: 'payload',
+    });
+  }
+  if (topic === Topics.MCP_RESPONSE && kind === Kind.EVT && !validateMCPResponse(candidate['payload'])) {
+    throw new ProtocolError('Invalid MCP response payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.MALFORMED,
+      field: 'payload',
+    });
+  }
+  if (topic === Topics.MCP_NOTIFICATION && (kind === Kind.CMD || kind === Kind.EVT) &&
+    !validateMCPNotification(candidate['payload'])) {
+    throw new ProtocolError('Invalid MCP notification payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.MALFORMED,
+      field: 'payload',
+    });
   }
 
   // Idempotency key validation: required on CMD, forbidden on non-CMD

@@ -23,6 +23,11 @@ export const Topics = {
   // Telemetry
   STATE_POSE: 'state.pose',
   STATE_BATTERY: 'state.battery',
+
+  // MCP JSON-RPC messages carried inside protocol envelopes
+  MCP_REQUEST: 'mcp.request',
+  MCP_RESPONSE: 'mcp.response',
+  MCP_NOTIFICATION: 'mcp.notification',
 } as const;
 
 export type TopicName = (typeof Topics)[keyof typeof Topics];
@@ -32,6 +37,7 @@ export * from './voice.ts';
 export * from './capability.ts';
 export * from './nav.ts';
 export * from './state.ts';
+export * from './mcp.ts';
 export type * from './registry.ts';
 
 /**
@@ -50,6 +56,27 @@ export const TopicKind: Record<TopicName, Kind> = {
   'nav.result': Kind.EVT,
   'state.pose': Kind.TELEM,
   'state.battery': Kind.TELEM,
+  'mcp.request': Kind.CMD,
+  'mcp.response': Kind.EVT,
+  'mcp.notification': Kind.CMD,
+};
+
+export const TopicAllowedKinds: Record<TopicName, readonly Kind[]> = {
+  'sys.hello': [Kind.CMD],
+  'sys.welcome': [Kind.ACK],
+  'sys.heartbeat': [Kind.EVT],
+  // The manifest is published as EVT and is also queried/replied to by existing consumers.
+  'cap.manifest': [Kind.EVT, Kind.QRY, Kind.RPY],
+  'voice.speak': [Kind.CMD],
+  'nav.goto': [Kind.CMD],
+  'nav.cancel': [Kind.CMD],
+  'nav.feedback': [Kind.EVT],
+  'nav.result': [Kind.EVT],
+  'state.pose': [Kind.TELEM],
+  'state.battery': [Kind.TELEM],
+  'mcp.request': [Kind.CMD],
+  'mcp.response': [Kind.EVT],
+  'mcp.notification': [Kind.CMD, Kind.EVT],
 };
 
 /** Only events wait in the durable outbox; telemetry is dropped and commands are not queued (ENVELOPE.md §5). */
