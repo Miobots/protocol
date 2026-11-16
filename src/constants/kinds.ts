@@ -1,7 +1,3 @@
-/**
- * Message Kind Constants.
- */
-
 export const Kind = {
   CMD: 'CMD',
   ACK: 'ACK',
