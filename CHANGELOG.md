@@ -2,6 +2,53 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-17 — The rest of the registry, the outbox and the teleop contract (P2.5, P2.6, P3.1–P3.3, P4.1–P4.3, P5.1, P5.2)
+
+### Added
+
+- **Twelve topics**, each with a payload type, a runtime guard and conformance vectors:
+  `sched.window`, `sched.fired` (P4.1) · `obs.sighting` (P3.1) · `diag.fault` (P3.3) ·
+  `map.snapshot`, `region.upsert`, `region.confirm`, `zone.upsert` (P2.5) · `sys.approval`,
+  `sys.killswitch` (P5.1) · `sys.error` (ENVELOPE §9) · `sys.receipt` (ENVELOPE §8).
+- **`PayloadGuards`** (`src/topics/index.ts`) — one table the codec consults for every inbound
+  envelope. The three hard-coded MCP checks in `decode` are now three rows in it.
+- **`sys.receipt`** — Brain confirms events by `msg_id`, and that is the only thing that trims an
+  outbox. Brain does not send it yet (B4.3).
+- **Fake Heart: its own schedule (P4.2).** A `sched.window` is cached and fired from the robot's
+  own timers, with Brain switched off, once per `occurrence_id`.
+- **Fake Heart: outbox (P4.3).** Events wait while Brain is away, drain oldest-first with their
+  original timestamps and a fresh `seq`, and are trimmed only on a receipt. In memory, capped at
+  1,000.
+- **Fake Heart: invented sightings (P3.2).** `FAKE_HEART_SIGHTINGS=true` emits one every 5 s.
+- **Fake Heart: `ERR sys.error`** for a message it cannot parse or a topic it does not know.
+- **Teleop frames (P2.6)** in `src/teleop/` — `hello`, `welcome`, `drive`, `status` — with
+  `conformance/teleop.json`. Deliberately not envelopes; the contract is `TELEOP.md` in the vault.
+- **`bun run bench` (P5.2).** On an i5-12450H laptop an encode + decode costs 1.4–2.3 µs for an
+  ordinary message and 49 µs for a 200 × 200 map — at 20 msg/s, 0.10% of one core at worst, against
+  a switch condition of 2%. **JSON stays.** Not yet run on the Pi.
+- **`tests/fake-heart.e2e.test.ts`** — the simulator over a real socket against a stand-in Brain.
+
+### Changed
+
+- **`queuesInOutbox(kind, topic)` now takes the topic.** Four `EVT` topics never queue:
+  `sys.heartbeat` and `cap.manifest` are re-published on a timer, and `mcp.response` /
+  `mcp.notification` answer a request that has already timed out.
+- **A Fake Heart drive carries on when Brain disconnects**, and its feedback and result wait in the
+  outbox. It used to be discarded, because there was nowhere to keep the result.
+- **Every Fake Heart command goes through one replay-and-expiry check** instead of a copy per topic.
+- `conformance/valid/seq-zero-and-large.json` carried a placeholder `obs.sighting` payload from
+  before the topic had a shape; it now carries a real one.
+
+### Fixed
+
+- **`main` was failing its own suite.** #17 raised the size cap to 512 KB and left
+  `conformance/invalid/oversized-payload.json` at 72 KB, which then parsed. The vector is now just
+  over 512 KB.
+- A topic named `constructor` or `toString` reached `Object.prototype` in the codec's registry
+  lookup and surfaced as an unknown parse error.
+
+---
+
 ## 2026-11-13 — MCP protocol foundation (Phase 2A)
 
 ### Added

@@ -11,10 +11,13 @@
 3. **Events queue; Telemetry is discarded:**
    - `EVT` is a domain fact (`nav.result`, `diag.fault`, `obs.sighting`, `sched.fired`) and survives network outages in durable outbox.
    - `TELEM` is a transient reading (`state.pose`, `state.battery`) and drops immediately during disconnects.
+   - Four `EVT` topics never queue, because a stored copy is only ever stale: `sys.heartbeat` and `cap.manifest` are re-published on a timer, and `mcp.response` / `mcp.notification` answer a request that has already timed out. `queuesInOutbox(kind, topic)` is the one place that says so.
+   - An outbox is trimmed on `sys.receipt` and on nothing else — never on send.
 4. **Asymmetric Queuing:** Heart queues events upward; Brain never queues commands downward (resends current state on reconnect).
 5. **`ACK` means accepted/rejected, NEVER finished.** Long operations emit immediate ACK, stream `EVT nav.feedback`, and finish with `EVT nav.result`.
 6. **Every `CMD` carries `idem_key`:** Duplicate deliveries replay the original ACK without re-executing.
-7. **Canonical Fake Heart (`src/simulator/fake-heart.ts`):** Dials out to Brain over WebSocket (`ws://localhost:8080/ws`). Must remain the single canonical simulation fixture for all components.
+7. **No topic carries a velocity.** Driving from the phone uses the teleop frames in `src/teleop/` on their own socket, so that "nothing Brain says can reach the wheels" stays checkable.
+8. **Canonical Fake Heart (`src/simulator/fake-heart.ts`):** Dials out to Brain over WebSocket (`ws://localhost:8080/ws`). Must remain the single canonical simulation fixture for all components.
 
 ---
 

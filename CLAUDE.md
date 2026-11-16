@@ -22,6 +22,15 @@ reminder — and it waits in the outbox until delivered. Telemetry is a reading;
 pose is worse than no pose. **Classifying a new topic as `EVT` or `TELEM` is a real decision, made
 once, and it is what keeps the durable outbox tractable.**
 
+**Four `EVT` topics never queue**, because a stored copy is only ever stale: `sys.heartbeat` and
+`cap.manifest` are re-published on a timer, and `mcp.response` / `mcp.notification` answer a
+request that has already timed out. `queuesInOutbox(kind, topic)` is the one place that says so.
+
+**An outbox is trimmed on `sys.receipt` and on nothing else** — never on send.
+
+**No topic carries a velocity.** Driving from the phone uses the teleop frames in `src/teleop/` on
+their own socket, so that "nothing Brain says can reach the wheels" stays checkable.
+
 **Heart queues events upward. Brain does not queue commands downward** — it re-sends current state
 on reconnect. A queue of commands is a queue of stale intentions.
 
@@ -62,14 +71,21 @@ bun run sim      # Starts the canonical Fake Heart simulator
 
 ## Current state
 
-**Fully implemented & tested.**
+See the vault's `STATUS.md` for the project's state; this covers only what is true inside this repo.
+
+**Every protocol task on the board is implemented and tested (P0.1–P5.2).**
 - Universal 10-field envelope format (`src/envelope/`)
 - Isolated JSON wire codec with strict runtime validation (`src/codec/`)
-- Topic registry for `sys.*`, `cap.manifest` and `voice.*`, with each topic bound to its payload type at compile time (`src/topics/registry.ts`)
+- Topic registry — 26 topics, each bound to its payload type and its kind at compile time (`src/topics/registry.ts`, `TopicKind`)
+- Runtime payload guards for the MCP topics and everything added since, in one table the codec reads (`PayloadGuards`). **The older topics — `sys.hello`, `voice.speak`, `nav.*`, `state.*`, `cap.manifest` — are still checked by their handlers, not by the codec.**
 - Shared capability IDs for both manifest halves (`src/topics/capability.ts`)
-- Canonical Fake Heart simulator with heartbeat watchdog, jittered backoff, receiver-side idempotency and expiry, and the robot's half of `cap.manifest` every 10 s (`src/simulator/fake-heart.ts`)
-- 31 cross-language conformance test vectors (`conformance/`) — read only by the TypeScript suite until `mio_gateway` exists
+- Teleop frames, deliberately not envelopes (`src/teleop/`, spec in `TELEOP.md`)
+- Canonical Fake Heart: heartbeat watchdog, jittered backoff, receiver-side idempotency and expiry, navigation, its own reminder schedule, an in-memory outbox, invented sightings, and the robot's half of `cap.manifest` on connect and every 10 s (`src/simulator/fake-heart.ts`)
+- 51 envelope vectors and 13 teleop vectors (`conformance/`) — read only by the TypeScript suite until `mio_gateway` exists
+- `bun run bench` — what the JSON codec costs; measured on a laptop, not yet on the Pi
 - `TEACHER.md` — a local study guide, gitignored
+
+**Not here yet:** Brain does not send `sys.receipt`, so today the Fake Heart re-sends every unconfirmed event on each reconnect. Nothing deletes a region or a zone. The Fake Heart sends no `state.pose`, `state.battery` or `map.snapshot`.
 
 **Consumers must re-run `bun install` after any change here** — a `file:` dependency is linked as per-file symlinks at install time.
 
@@ -77,4 +93,5 @@ bun run sim      # Starts the canonical Fake Heart simulator
 
 - `TEACHER.md` (local, gitignored) — a systems & TypeScript study guide for this protocol.
 - `../../03 Engineering/Protocol/ENVELOPE.md` — **The full specification.** Message kinds, acknowledgement, idempotency, queuing, expiry, error handling, and worked examples.
+- `../../03 Engineering/Protocol/TELEOP.md` — the phone-to-robot driving contract.
 
