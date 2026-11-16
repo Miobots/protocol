@@ -1,19 +1,14 @@
-/**
- * JSON serialization, deserialization, and schema validation for envelopes.
- */
-
 import { Kind, ProtocolErrorCode, ProtocolErrorReason, ProtocolDefaults } from '../constants/index.ts';
 import { ProtocolError, type Envelope } from '../envelope/types.ts';
-import {
-  TopicAllowedKinds,
-  Topics,
-  validateMCPNotification,
-  validateMCPRequest,
-  validateMCPResponse,
-} from '../topics/index.ts';
+import { PayloadGuards, TopicAllowedKinds } from '../topics/index.ts';
 
 const VALID_KINDS = new Set<string>(Object.values(Kind));
 const DIGITS_ONLY = /^\d+$/;
+
+/** A registry lookup that a topic named `constructor` or `toString` cannot reach past. */
+function own<T>(table: Record<string, T | undefined>, key: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+}
 
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
@@ -43,9 +38,6 @@ export function decodeUtf8(bytes: Uint8Array): string {
   return result;
 }
 
-/**
- * Encodes an envelope into a wire-ready JSON string.
- */
 export function encode<TTopic extends string, TPayload>(envelope: Envelope<TTopic, TPayload>): string {
   try {
     const encoded = JSON.stringify(envelope);
@@ -63,9 +55,6 @@ export function encode<TTopic extends string, TPayload>(envelope: Envelope<TTopi
   }
 }
 
-/**
- * Validates whether an unknown object conforms to the Envelope structure.
- */
 export function validateEnvelope<TTopic extends string = string, TPayload = unknown>(
   obj: unknown
 ): Envelope<TTopic, TPayload> {
@@ -151,7 +140,7 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
 
   const topic = candidate['topic'];
   const kind = candidate['kind'];
-  const allowedKinds = TopicAllowedKinds[topic as keyof typeof TopicAllowedKinds];
+  const allowedKinds = own<readonly Kind[]>(TopicAllowedKinds, topic);
   if (allowedKinds && kind !== Kind.ACK && !allowedKinds.includes(kind as Kind)) {
     throw new ProtocolError('Envelope kind is not valid for this topic', ProtocolErrorCode.ERR_INVALID_TOPIC, {
       reason: ProtocolErrorReason.INVALID_ENVELOPE,
@@ -182,7 +171,6 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     });
   }
 
-  // Check payload size
   try {
     const payloadStr = JSON.stringify(candidate['payload']);
     if (payloadStr && getUtf8ByteLength(payloadStr) > ProtocolDefaults.MAX_PAYLOAD_BYTES) {
@@ -199,27 +187,16 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     });
   }
 
-  if (topic === Topics.MCP_REQUEST && kind === Kind.CMD && !validateMCPRequest(candidate['payload'])) {
-    throw new ProtocolError('Invalid MCP request payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
-      reason: ProtocolErrorReason.MALFORMED,
-      field: 'payload',
-    });
-  }
-  if (topic === Topics.MCP_RESPONSE && kind === Kind.EVT && !validateMCPResponse(candidate['payload'])) {
-    throw new ProtocolError('Invalid MCP response payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
-      reason: ProtocolErrorReason.MALFORMED,
-      field: 'payload',
-    });
-  }
-  if (topic === Topics.MCP_NOTIFICATION && (kind === Kind.CMD || kind === Kind.EVT) &&
-    !validateMCPNotification(candidate['payload'])) {
-    throw new ProtocolError('Invalid MCP notification payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+  // One table for every topic that has a runtime check. An ACK answers on the command's topic but
+  // carries an AckPayload, so it is not held to the command's shape.
+  const guard = own(PayloadGuards, topic);
+  if (guard && kind !== Kind.ACK && !guard(candidate['payload'])) {
+    throw new ProtocolError(`Invalid ${topic} payload`, ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
       reason: ProtocolErrorReason.MALFORMED,
       field: 'payload',
     });
   }
 
-  // Idempotency key validation: required on CMD, forbidden on non-CMD
   if (candidate['kind'] === Kind.CMD) {
     if (typeof candidate['idem_key'] !== 'string' || candidate['idem_key'].length === 0) {
       throw new ProtocolError(
@@ -238,7 +215,6 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     });
   }
 
-  // Expiration timestamp validation: optional on CMD, forbidden on non-CMD
   if (candidate['expires_at'] !== undefined) {
     if (typeof candidate['expires_at'] !== 'number' || !Number.isFinite(candidate['expires_at'])) {
       throw new ProtocolError('Field "expires_at", if present, must be a number', ProtocolErrorCode.ERR_INVALID_EXPIRES_AT, {
@@ -265,9 +241,6 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
   return candidate as unknown as Envelope<TTopic, TPayload>;
 }
 
-/**
- * Decodes a raw wire string or binary buffer into a validated Envelope.
- */
 export function decode<TTopic extends string = string, TPayload = unknown>(
   raw: string | Uint8Array
 ): Envelope<TTopic, TPayload> {
@@ -297,9 +270,6 @@ export type ParseResult<TTopic extends string, TPayload> =
   | { success: true; data: Envelope<TTopic, TPayload> }
   | { success: false; error: ProtocolError };
 
-/**
- * Safely parses and validates a wire payload without throwing.
- */
 export function parse<TTopic extends string = string, TPayload = unknown>(
   raw: string | Uint8Array
 ): ParseResult<TTopic, TPayload> {

@@ -1,5 +1,7 @@
 /** JSON-RPC 2.0 payloads carried inside Miobots envelopes. */
 
+import { isRecord } from "./guards.ts";
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export interface JsonObject {
@@ -47,10 +49,6 @@ export function isJsonValue(value: unknown, depth = 0): value is JsonValue {
   return entries.length <= 1_024 && entries.every(([key, item]) =>
     key !== "__proto__" && key !== "prototype" && key !== "constructor" && isJsonValue(item, depth + 1)
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isId(value: unknown): value is JsonRpcId {

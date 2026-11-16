@@ -1,0 +1,21 @@
+{
+  "description": "sys.killswitch whose active flag is a string",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C8",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C8",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "sys.killswitch",
+    "seq": 500,
+    "idem_key": "kill-01J6G7M8N9P0Q1R2S3T4U5V7C8",
+    "payload": {
+      "active": "yes"
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}

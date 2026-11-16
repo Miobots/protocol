@@ -1,7 +1,8 @@
 /**
  * Canonical Fake Heart Simulator.
  * Dials out to Brain over WebSocket, authenticates with dev token, exchanges bidirectional heartbeats,
- * and handles speech and navigation commands.
+ * and handles speech, navigation and schedule commands. What it has to report is kept in an outbox
+ * until Brain confirms it, so reminders and drives carry on while Brain is away.
  * Run with: bun run src/simulator/fake-heart.ts [--refuse-nav]
  */
 
@@ -22,6 +23,8 @@ import {
   parse,
   SequenceCounter,
   HeartCapabilities,
+  queuesInOutbox,
+  isReceiptPayload,
   type Envelope,
   type HelloPayload,
   type WelcomePayload,
@@ -32,7 +35,11 @@ import {
   type NavCancelPayload,
   type NavGotoPayload,
   type NavResultPayload,
+  type SchedWindowPayload,
+  type ScheduleOccurrence,
+  type SightingPayload,
 } from '../index.ts';
+import { isRecord } from '../topics/guards.ts';
 
 const BRAIN_URL = process.env['BRAIN_URL'] || ProtocolDefaults.DEFAULT_BRAIN_URL;
 const DEV_TOKEN = process.env['DEV_TOKEN'] || ProtocolDefaults.DEFAULT_DEV_TOKEN;
@@ -41,8 +48,10 @@ const DOCKING_UNAVAILABLE = process.env['FAKE_HEART_DOCKING_UNAVAILABLE'] === 't
 // `let`: typing `r` + Enter in the simulator's terminal flips it, so a demo can show a drive and a
 // refusal in one run instead of restarting with the flag.
 let refuseNav = process.env['FAKE_HEART_REFUSE_NAV'] === 'true' || process.argv.includes('--refuse-nav');
+const SIGHTINGS = process.env['FAKE_HEART_SIGHTINGS'] === 'true';
 const REFUSAL_BATTERY_PCT = 16;
 const NAV_TICK_MS = 500;
+const SIGHTING_INTERVAL_MS = 5000;
 
 /**
  * Metres a goal starts from, one per tick. The default 5 m finishes in 2.5 s — fine for tests, too
@@ -59,6 +68,7 @@ let reconnectTimer: NodeJS.Timeout | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let capabilityTimer: NodeJS.Timeout | null = null;
 let navigationTimer: NodeJS.Timeout | null = null;
+let sightingTimer: NodeJS.Timeout | null = null;
 let backoffDelayMs: number = ProtocolDefaults.RECONNECT_INITIAL_DELAY_MS;
 const MAX_BACKOFF_MS = ProtocolDefaults.RECONNECT_MAX_DELAY_MS;
 const BACKOFF_MULTIPLIER = ProtocolDefaults.RECONNECT_BACKOFF_MULTIPLIER;
@@ -67,6 +77,8 @@ let isShuttingDown = false;
 // Per-connection outbound sequence counter
 let outboundSeq = new SequenceCounter();
 let lastHeartbeatReceivedMs = 0;
+/** True between an accepted `sys.welcome` and the socket closing. */
+let linkUp = false;
 
 interface ActiveNavigation {
   goalId: string;
@@ -149,6 +161,133 @@ export function resetIdempotencyCache(): void {
 }
 
 /**
+ * Outbox mock (P4.3, ENVELOPE.md §5 and §8).
+ *
+ * An event is a fact. With Brain away it waits here; on reconnect everything still here goes out
+ * oldest-first; and an entry leaves only when Brain names it in a `sys.receipt` — never on send,
+ * because acknowledging on send is how the one message that mattered gets lost.
+ */
+// ponytail: in memory and capped, so a restart loses it. The real one is on disk (H3.2).
+const OUTBOX_LIMIT = 1000;
+const outbox: Envelope[] = [];
+
+export function enqueue(event: Envelope): void {
+  outbox.push(event);
+  if (outbox.length > OUTBOX_LIMIT) {
+    const dropped = outbox.shift();
+    log(`OUTBOX FULL — dropped the oldest event (${dropped?.topic} ${dropped?.msg_id}). Brain has not confirmed in a long time.`);
+  }
+}
+
+export function pendingEvents(): readonly Envelope[] {
+  return outbox;
+}
+
+/** Trims the events Brain says it has. Returns how many went. */
+export function confirmDelivered(msgIds: readonly string[]): number {
+  const confirmed = new Set(msgIds);
+  const before = outbox.length;
+  for (let i = outbox.length - 1; i >= 0; i--) {
+    if (confirmed.has(outbox[i]!.msg_id)) outbox.splice(i, 1);
+  }
+  return before - outbox.length;
+}
+
+/** Test seam. */
+export function resetOutbox(): void {
+  outbox.length = 0;
+}
+
+/** Placeholder `seq` for an event that has not gone out yet — see {@link sendStamped}. */
+const UNSENT = 0;
+
+/**
+ * `seq` belongs to the connection, not to the event (ENVELOPE.md §6), so it is stamped at the
+ * moment of sending, every time. `msg_id` and both clocks stay as they were when it happened.
+ */
+function sendStamped(event: Envelope): void {
+  sendEnvelope({ ...event, seq: outboundSeq.next() });
+}
+
+/** Something the robot wants Brain to know: sent now if Brain is listening, kept until confirmed. */
+function publish(event: Envelope): void {
+  if (queuesInOutbox(event.kind, event.topic)) enqueue(event);
+  if (linkUp) sendStamped(event);
+}
+
+function drainOutbox(): void {
+  if (outbox.length === 0) return;
+  log(`Draining ${outbox.length} event(s) Brain has not confirmed, oldest first`);
+  for (const event of outbox) sendStamped(event);
+}
+
+/**
+ * The robot's own schedule (P4.2). The timers are the robot's, not the connection's: a reminder
+ * fires on time whether or not Brain is there to hear about it.
+ */
+const scheduled = new Map<string, NodeJS.Timeout>();
+/** Idempotent on occurrence id: a window pushed again must not announce the same moment twice. */
+const firedOccurrences = new Set<string>();
+/** `setTimeout` wraps round past this and fires at once — about 24.8 days, well beyond a 72 h window. */
+const MAX_TIMER_MS = 0x7fffffff;
+
+export function cacheWindow(window: SchedWindowPayload, nowMs: number = Date.now()): void {
+  resetSchedule(false);
+  for (const occurrence of window.occurrences) {
+    const delayMs = Math.max(0, occurrence.due_time_ms - nowMs);
+    if (firedOccurrences.has(occurrence.occurrence_id) || delayMs > MAX_TIMER_MS) continue;
+    scheduled.set(occurrence.occurrence_id, setTimeout(() => fireOccurrence(occurrence), delayMs));
+    log(`  ⏱ ${occurrence.occurrence_id} in ${(delayMs / 1000).toFixed(1)}s "${occurrence.text}"`);
+  }
+  log(`Cached ${scheduled.size} occurrence(s) for the next 72h`);
+}
+
+function fireOccurrence(occurrence: ScheduleOccurrence): void {
+  scheduled.delete(occurrence.occurrence_id);
+  firedOccurrences.add(occurrence.occurrence_id);
+  console.log(`\n⏰ [REMINDER] "${occurrence.text}"\n`);
+  publish(
+    newEnvelope({
+      kind: Kind.EVT,
+      topic: Topics.SCHED_FIRED,
+      seq: UNSENT,
+      payload: { occurrence_id: occurrence.occurrence_id },
+    })
+  );
+}
+
+/** Drops every pending timer. Tests also forget what has fired. */
+export function resetSchedule(forgetFired: boolean = true): void {
+  for (const timer of scheduled.values()) clearTimeout(timer);
+  scheduled.clear();
+  if (forgetFired) firedOccurrences.clear();
+}
+
+/**
+ * Invented sightings (P3.2) — enough to fill Brain's memory with no camera and no vision model.
+ * Real sightings later arrive through the same door.
+ */
+const SIGHTING_FIXTURES: readonly SightingPayload[] = [
+  { label: 'glasses', aliases: ['chashma', 'spectacles'], confidence: 0.82, region_id: 'living_room', pose: [3.1, -0.4, 0] },
+  { label: 'keys', aliases: ['chabi', 'chabiyan'], confidence: 0.77, region_id: 'entrance', pose: [0.4, 1.2, 1.57] },
+  { label: 'wallet', aliases: ['batwa', 'purse'], confidence: 0.71, region_id: 'bedroom', pose: [-2.2, 2.6, 3.14] },
+  { label: 'medicine', aliases: ['dawai', 'tablets'], confidence: 0.88, region_id: 'kitchen', pose: [3.2, -1.1, 0] },
+];
+
+export function sightingAt(tick: number): SightingPayload {
+  return SIGHTING_FIXTURES[tick % SIGHTING_FIXTURES.length]!;
+}
+
+function startSightings(): void {
+  let tick = 0;
+  sightingTimer = setInterval(() => {
+    const sighting = sightingAt(tick++);
+    publish(newEnvelope({ kind: Kind.EVT, topic: Topics.OBS_SIGHTING, seq: UNSENT, payload: sighting }));
+    log(`Sent obs.sighting ${sighting.label} in ${sighting.region_id}`);
+  }, SIGHTING_INTERVAL_MS);
+}
+
+/**
  * Calculates exponential backoff with random jitter factor (0.5 to 1.5).
  * Conforms to ENVELOPE.md §8.
  */
@@ -183,10 +322,6 @@ function stopNavigation(): void {
     navigationTimer = null;
   }
   activeNavigation = null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function isNavGotoPayload(value: unknown): value is NavGotoPayload {
@@ -235,10 +370,10 @@ function sendNavigationResult(success: boolean, reason?: string): void {
     kind: Kind.EVT,
     topic: Topics.NAV_RESULT,
     corr_id: navigation.corrId,
-    seq: outboundSeq,
+    seq: UNSENT,
     payload,
   });
-  sendEnvelope(result);
+  publish(result);
   log(`Sent nav.result goal_id=${navigation.goalId} success=${success}`);
   stopNavigation();
 }
@@ -257,7 +392,9 @@ function startNavigation(payload: NavGotoPayload, corrId: string): void {
   };
 
   navigationTimer = setInterval(() => {
-    if (!activeNavigation || !ws || ws.readyState !== WebSocket.OPEN) {
+    // No link check: the robot keeps driving when Brain goes away, and what it has to say waits
+    // in the outbox.
+    if (!activeNavigation) {
       stopNavigation();
       return;
     }
@@ -268,13 +405,13 @@ function startNavigation(payload: NavGotoPayload, corrId: string): void {
       kind: Kind.EVT,
       topic: Topics.NAV_FEEDBACK,
       corr_id: navigation.corrId,
-      seq: outboundSeq,
+      seq: UNSENT,
       payload: {
         distance_remaining_m: navigation.distanceRemainingM,
         estimated_time_remaining_s: navigation.distanceRemainingM,
       },
     });
-    sendEnvelope(feedback);
+    publish(feedback);
     log(`Sent nav.feedback goal_id=${navigation.goalId} distance_remaining_m=${navigation.distanceRemainingM}`);
 
     if (navigation.distanceRemainingM === 0) {
@@ -362,6 +499,50 @@ function publishCapabilities(): void {
   sendEnvelope(capabilityEnv);
 }
 
+/**
+ * Answers a command and remembers the answer under its `idem_key`, so a retry gets the same one
+ * back instead of running twice.
+ */
+function answer(env: Envelope, payload: AckPayload): void {
+  const ack = createAck(env, payload, outboundSeq);
+  remember(env.idem_key, ack);
+  sendEnvelope(ack);
+}
+
+/**
+ * Runs before any command does. A duplicate gets its original ACK replayed (ENVELOPE.md §4:
+ * "never executed twice" — a flaky hotspot must not make the robot say the same thing three
+ * times), and a command past `expires_at` is refused. True if either answered it.
+ */
+function answeredAlready(env: Envelope): boolean {
+  const replayed = replayIfSeen(env.idem_key);
+  if (replayed) {
+    sendEnvelope(replayed);
+    log(`Duplicate idem_key=${env.idem_key} — replayed the original ${env.topic} ACK, did not run it again`);
+    return true;
+  }
+
+  // After the replay: a retry of a command that already ran gets its original ACK, not this.
+  const expired = rejectIfExpired(env, outboundSeq);
+  if (expired) {
+    remember(env.idem_key, expired);
+    sendEnvelope(expired);
+    log(`Expired ${env.topic} msg_id=${env.msg_id} (expires_at=${env.expires_at}) — rejected, did not run it`);
+    return true;
+  }
+  return false;
+}
+
+/** ENVELOPE.md §9: a bad message is answered and logged. It never closes the connection. */
+function sendError(reason: string, about: { msg_id?: string; field?: string } = {}): void {
+  sendEnvelope(
+    newEnvelope({ kind: Kind.ERR, topic: Topics.SYS_ERROR, seq: outboundSeq, payload: { reason, ...about } })
+  );
+}
+
+/** Commands the real robot stores in its map. The fixture accepts and logs them. */
+const MAP_COMMANDS: ReadonlySet<string> = new Set([Topics.REGION_UPSERT, Topics.REGION_CONFIRM, Topics.ZONE_UPSERT]);
+
 export function connect(): void {
   if (isShuttingDown) return;
 
@@ -397,6 +578,7 @@ export function connect(): void {
     const result = parse(rawData);
     if (!result.success) {
       log(`Failed to parse incoming envelope: ${result.error.message}`);
+      sendError(result.error.reason, { field: result.error.field });
       return;
     }
 
@@ -407,6 +589,8 @@ export function connect(): void {
       const welcome = env.payload as WelcomePayload;
       if (welcome.accepted) {
         log(`Handshake accepted by Brain! Session: ${welcome.session_id}`);
+        linkUp = true;
+        drainOutbox();
         startHeartbeat();
         sendCapabilities();
       } else {
@@ -417,156 +601,6 @@ export function connect(): void {
       return;
     }
 
-    if (env.topic === Topics.NAV_GOTO && env.kind === Kind.CMD) {
-      const replayed = replayIfSeen(env.idem_key);
-      if (replayed) {
-        sendEnvelope(replayed);
-        log(`Duplicate idem_key=${env.idem_key} — replayed nav.goto ACK`);
-        return;
-      }
-
-      const expired = rejectIfExpired(env, outboundSeq);
-      if (expired) {
-        remember(env.idem_key, expired);
-        sendEnvelope(expired);
-        log(`Expired nav.goto msg_id=${env.msg_id} — rejected`);
-        return;
-      }
-
-      if (!isNavGotoPayload(env.payload)) {
-        const invalid = createAck(
-          env,
-          {
-            accepted: false,
-            reason: navigationPayloadReason(env.payload),
-            exec_status: ExecutionStatus.REJECTED,
-          },
-          outboundSeq,
-        );
-        remember(env.idem_key, invalid);
-        sendEnvelope(invalid);
-        log('nav.goto received -> REJECTED (invalid_navigation_payload)');
-        return;
-      }
-
-      let ack: Envelope<string, AckPayload>;
-      if (refuseNav) {
-        ack = createAck(
-          env,
-          {
-            accepted: false,
-            reason: 'battery_below_return_margin',
-            exec_status: ExecutionStatus.REJECTED,
-            details: { battery_pct: REFUSAL_BATTERY_PCT },
-          },
-          outboundSeq,
-        );
-        log(`nav.goto received -> REJECTED (battery_below_return_margin, ${REFUSAL_BATTERY_PCT}%)`);
-      } else if (activeNavigation) {
-        ack = createAck(
-          env,
-          { accepted: false, reason: 'navigation_goal_active', exec_status: ExecutionStatus.REJECTED },
-          outboundSeq,
-        );
-        log(`nav.goto received -> REJECTED (navigation_goal_active, ${activeNavigation.goalId})`);
-      } else {
-        ack = createAck(
-          env,
-          { accepted: true, exec_status: ExecutionStatus.EXECUTING, goal_id: env.payload.goal_id },
-          outboundSeq,
-        );
-        startNavigation(env.payload, env.corr_id);
-      }
-
-      remember(env.idem_key, ack);
-      sendEnvelope(ack);
-      return;
-    }
-
-    if (env.topic === Topics.NAV_CANCEL && env.kind === Kind.CMD) {
-      const replayed = replayIfSeen(env.idem_key);
-      if (replayed) {
-        sendEnvelope(replayed);
-        log(`Duplicate idem_key=${env.idem_key} — replayed nav.cancel ACK`);
-        return;
-      }
-
-      const expired = rejectIfExpired(env, outboundSeq);
-      if (expired) {
-        remember(env.idem_key, expired);
-        sendEnvelope(expired);
-        log(`Expired nav.cancel msg_id=${env.msg_id} — rejected`);
-        return;
-      }
-
-      if (!isNavCancelPayload(env.payload)) {
-        const invalid = createAck(
-          env,
-          { accepted: false, reason: 'invalid_navigation_payload', exec_status: ExecutionStatus.REJECTED },
-          outboundSeq,
-        );
-        remember(env.idem_key, invalid);
-        sendEnvelope(invalid);
-        return;
-      }
-
-      const cancelReason = navigationCancelReason(activeNavigation, env.payload.goal_id);
-      if (cancelReason) {
-        const missing = createAck(
-          env,
-          { accepted: false, reason: cancelReason, exec_status: ExecutionStatus.REJECTED },
-          outboundSeq,
-        );
-        remember(env.idem_key, missing);
-        sendEnvelope(missing);
-        log(`nav.cancel received -> REJECTED (goal_not_found, ${env.payload.goal_id})`);
-        return;
-      }
-
-      const accepted = createAck(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED }, outboundSeq);
-      remember(env.idem_key, accepted);
-      sendEnvelope(accepted);
-      log(`nav.cancel received -> ACCEPTED (${env.payload.goal_id})`);
-      sendNavigationResult(false, 'cancelled');
-      return;
-    }
-
-    // Handle voice.speak command
-    if (env.topic === Topics.VOICE_SPEAK && env.kind === Kind.CMD) {
-      // Replay before executing. ENVELOPE.md §5: "Every CMD carries an idem_key and is never
-      // executed twice." A flaky hotspot must not make the robot say the same thing three times.
-      const replayed = replayIfSeen(env.idem_key);
-      if (replayed) {
-        sendEnvelope(replayed);
-        log(`Duplicate idem_key=${env.idem_key} — replayed original ACK, did not speak again`);
-        return;
-      }
-
-      // After the replay: a retry of a command that already ran gets its original ACK, not this.
-      const expired = rejectIfExpired(env, outboundSeq);
-      if (expired) {
-        remember(env.idem_key, expired);
-        sendEnvelope(expired);
-        log(`Expired CMD msg_id=${env.msg_id} (expires_at=${env.expires_at}) — rejected, did not speak`);
-        return;
-      }
-
-      const speak = env.payload as SpeakPayload;
-      const lang = speak.lang || Language.EN;
-      const priority = speak.priority || Priority.NORMAL;
-      console.log(`\n🔊 [SPEAK ${lang}] "${speak.text}" (priority: ${priority})\n`);
-
-      const ack = createAck(
-        env,
-        { accepted: true, exec_status: ExecutionStatus.COMPLETED },
-        outboundSeq
-      );
-      remember(env.idem_key, ack);
-      sendEnvelope(ack);
-      log(`Sent ACK for msg_id: ${env.msg_id}`);
-      return;
-    }
-
     // Handle heartbeat from Brain
     if (env.topic === Topics.SYS_HEARTBEAT) {
       lastHeartbeatReceivedMs = Date.now();
@@ -574,13 +608,107 @@ export function connect(): void {
       return;
     }
 
+    // Brain confirming events arrived — the only thing that trims the outbox.
+    if (env.topic === Topics.SYS_RECEIPT) {
+      if (isReceiptPayload(env.payload)) {
+        const trimmed = confirmDelivered(env.payload.msg_ids);
+        log(`Brain confirmed ${trimmed} event(s); ${outbox.length} still waiting`);
+      }
+      return;
+    }
+
+    if (env.kind === Kind.ERR) {
+      log(`Brain could not use a message: ${JSON.stringify(env.payload)}`);
+      return;
+    }
+
+    if (env.kind === Kind.CMD && answeredAlready(env)) return;
+
+    if (env.topic === Topics.NAV_GOTO && env.kind === Kind.CMD) {
+      if (!isNavGotoPayload(env.payload)) {
+        answer(env, {
+          accepted: false,
+          reason: navigationPayloadReason(env.payload),
+          exec_status: ExecutionStatus.REJECTED,
+        });
+        log('nav.goto received -> REJECTED (invalid_navigation_payload)');
+        return;
+      }
+
+      if (refuseNav) {
+        answer(env, {
+          accepted: false,
+          reason: 'battery_below_return_margin',
+          exec_status: ExecutionStatus.REJECTED,
+          details: { battery_pct: REFUSAL_BATTERY_PCT },
+        });
+        log(`nav.goto received -> REJECTED (battery_below_return_margin, ${REFUSAL_BATTERY_PCT}%)`);
+      } else if (activeNavigation) {
+        answer(env, { accepted: false, reason: 'navigation_goal_active', exec_status: ExecutionStatus.REJECTED });
+        log(`nav.goto received -> REJECTED (navigation_goal_active, ${activeNavigation.goalId})`);
+      } else {
+        startNavigation(env.payload, env.corr_id);
+        answer(env, { accepted: true, exec_status: ExecutionStatus.EXECUTING, goal_id: env.payload.goal_id });
+      }
+      return;
+    }
+
+    if (env.topic === Topics.NAV_CANCEL && env.kind === Kind.CMD) {
+      if (!isNavCancelPayload(env.payload)) {
+        answer(env, { accepted: false, reason: 'invalid_navigation_payload', exec_status: ExecutionStatus.REJECTED });
+        return;
+      }
+
+      const cancelReason = navigationCancelReason(activeNavigation, env.payload.goal_id);
+      if (cancelReason) {
+        answer(env, { accepted: false, reason: cancelReason, exec_status: ExecutionStatus.REJECTED });
+        log(`nav.cancel received -> REJECTED (goal_not_found, ${env.payload.goal_id})`);
+        return;
+      }
+
+      // The ACK goes first: the result is a separate event on the same corr_id (ENVELOPE.md §3).
+      answer(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED });
+      log(`nav.cancel received -> ACCEPTED (${env.payload.goal_id})`);
+      sendNavigationResult(false, 'cancelled');
+      return;
+    }
+
+    // Handle voice.speak command
+    if (env.topic === Topics.VOICE_SPEAK && env.kind === Kind.CMD) {
+      const speak = env.payload as SpeakPayload;
+      const lang = speak.lang || Language.EN;
+      const priority = speak.priority || Priority.NORMAL;
+      console.log(`\n🔊 [SPEAK ${lang}] "${speak.text}" (priority: ${priority})\n`);
+
+      answer(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED });
+      log(`Sent ACK for msg_id: ${env.msg_id}`);
+      return;
+    }
+
+    // The codec has already checked these payloads against their guards (PayloadGuards).
+    if (env.topic === Topics.SCHED_WINDOW && env.kind === Kind.CMD) {
+      cacheWindow(env.payload as SchedWindowPayload);
+      answer(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED });
+      return;
+    }
+
+    if (env.kind === Kind.CMD && MAP_COMMANDS.has(env.topic)) {
+      log(`${env.topic} received: ${JSON.stringify(env.payload)}`);
+      answer(env, { accepted: true, exec_status: ExecutionStatus.COMPLETED });
+      return;
+    }
+
     log(`Received unhandled topic: ${env.topic} [kind=${env.kind}]`);
+    // ENVELOPE.md §9: an unknown topic gets an ERR, never a guess. An ACK is itself an answer and
+    // gets none back, or two peers that do not know each other's topics would answer for ever.
+    if (env.kind !== Kind.ACK) {
+      sendError(ProtocolErrorReason.UNKNOWN_TOPIC, { msg_id: env.msg_id });
+    }
   });
 
   ws.on('close', (code, reason) => {
+    linkUp = false;
     cleanupTimers();
-    // A disconnected active goal is discarded; this simulator has no outbox for a later result.
-    stopNavigation();
     log(`Connection closed (${code} - ${reason.toString() || 'no reason'}).`);
     scheduleReconnect();
   });
@@ -607,6 +735,8 @@ export function shutdown(): void {
   isShuttingDown = true;
   cleanupTimers();
   stopNavigation();
+  resetSchedule(false);
+  if (sightingTimer) clearInterval(sightingTimer);
   log('Shutting down Fake Heart simulator...');
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (ws) ws.close();
@@ -618,6 +748,10 @@ process.on('SIGTERM', shutdown);
 // Auto-start only when executed directly
 if (import.meta.main) {
   log(`Drives start ${NAV_START_DISTANCE_M} m out. Refusal is ${refuseNav ? 'ON' : 'OFF'} — type r + Enter to toggle.`);
+  if (SIGHTINGS) {
+    log(`Inventing a sighting every ${SIGHTING_INTERVAL_MS / 1000} s (FAKE_HEART_SIGHTINGS).`);
+    startSightings();
+  }
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (line: string) => {
     if (line.trim().toLowerCase() !== 'r') return;

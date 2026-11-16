@@ -22,8 +22,18 @@ describe('Telemetry topics (P2.4)', () => {
       payload: { percentage: 76.5, voltage: 15.2, is_charging: false },
       seq: 2,
     });
-    assert.equal(queuesInOutbox(pose.kind), false);
-    assert.equal(queuesInOutbox(battery.kind), false);
-    assert.equal(queuesInOutbox(TopicKind[Topics.NAV_RESULT]), true);
+    assert.equal(queuesInOutbox(pose.kind, pose.topic), false);
+    assert.equal(queuesInOutbox(battery.kind, battery.topic), false);
+    assert.equal(queuesInOutbox(TopicKind[Topics.NAV_RESULT], Topics.NAV_RESULT), true);
+  });
+
+  it('the map is telemetry too, and periodic or request/response events never queue', () => {
+    assert.equal(queuesInOutbox(TopicKind[Topics.MAP_SNAPSHOT], Topics.MAP_SNAPSHOT), false);
+    for (const topic of [Topics.SYS_HEARTBEAT, Topics.CAP_MANIFEST, Topics.MCP_RESPONSE, Topics.MCP_NOTIFICATION]) {
+      assert.equal(queuesInOutbox(Kind.EVT, topic), false, topic);
+    }
+    for (const topic of [Topics.SCHED_FIRED, Topics.OBS_SIGHTING, Topics.DIAG_FAULT, Topics.NAV_FEEDBACK]) {
+      assert.equal(queuesInOutbox(TopicKind[topic], topic), true, topic);
+    }
   });
 });

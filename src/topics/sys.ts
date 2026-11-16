@@ -2,6 +2,8 @@ import { DeviceRole, SystemHealth, ProtocolDefaults, Kind } from '../constants/i
 import { newEnvelope } from '../envelope/envelope.ts';
 import type { SequenceCounter } from '../envelope/sequence.ts';
 import type { Envelope } from '../envelope/types.ts';
+import { isNumber, isRecord, isText } from './guards.ts';
+import { isJsonValue, type JsonObject } from './mcp.ts';
 
 export interface HelloPayload {
   device_id: string;
@@ -112,4 +114,70 @@ export function createWelcomeAck(
     seq: options.seq,
     payload,
   });
+}
+
+/**
+ * `sys.error` — "your message was bad" (ENVELOPE.md §9). It is never answered and never retried,
+ * and it never closes the connection: only a bad token does that.
+ */
+export interface ErrorPayload {
+  /** A `ProtocolErrorReason`: `malformed`, `invalid_envelope`, `unknown_topic`, `unknown_kind`, … */
+  reason: string;
+  /** The offending message, when it could be read far enough to name. */
+  msg_id?: string;
+  /** The field that was wrong, for `invalid_envelope`. */
+  field?: string;
+}
+
+export function isErrorPayload(value: unknown): value is ErrorPayload {
+  return isRecord(value) && isText(value.reason);
+}
+
+/**
+ * `sys.receipt` — Brain confirming that events arrived (ENVELOPE.md §8). The sender trims its
+ * outbox on this and on nothing else: acknowledging on send is how the one message that mattered
+ * gets lost. Events are named by `msg_id`, the only identity that survives a reconnect.
+ */
+export interface ReceiptPayload {
+  msg_ids: string[];
+}
+
+export function isReceiptPayload(value: unknown): value is ReceiptPayload {
+  return isRecord(value) && Array.isArray(value.msg_ids) && value.msg_ids.every(isText);
+}
+
+/**
+ * `sys.approval` (P5.1) — asks a human for permission, showing the **exact** arguments.
+ *
+ * The answer is the ACK: `accepted: true` is a tap on Approve, `accepted: false` a tap on Reject,
+ * and silence until `expires_at` is neither. That is why this command waits
+ * `ProtocolDefaults.DEFAULT_APPROVAL_TIMEOUT_MS` for its ACK rather than the usual five seconds.
+ * Who approved comes from the token on the connection that answered, never from the payload.
+ */
+export interface ApprovalPayload {
+  approval_id: string;
+  tool_name: string;
+  args: JsonObject;
+  /** Unix epoch ms. What the card counts down to. */
+  expires_at: number;
+}
+
+export function isApprovalPayload(value: unknown): value is ApprovalPayload {
+  return (
+    isRecord(value) &&
+    isText(value.approval_id) &&
+    isText(value.tool_name) &&
+    isRecord(value.args) &&
+    isJsonValue(value.args) &&
+    isNumber(value.expires_at)
+  );
+}
+
+/** `sys.killswitch` (P5.1) — everything off at once, or back on. */
+export interface KillSwitchPayload {
+  active: boolean;
+}
+
+export function isKillSwitchPayload(value: unknown): value is KillSwitchPayload {
+  return isRecord(value) && typeof value.active === 'boolean';
 }

@@ -1,0 +1,15 @@
+[
+  { "description": "hello with the Brain-issued token", "raw": "{\"t\":\"hello\",\"token\":\"mio-dev-secret-token\",\"protocol_version\":1}", "expect": { "parses": true, "frame": { "t": "hello", "token": "mio-dev-secret-token", "protocol_version": 1 } } },
+  { "description": "welcome announcing the deadman", "raw": "{\"t\":\"welcome\",\"deadman_ms\":400}", "expect": { "parses": true, "frame": { "t": "welcome", "deadman_ms": 400 } } },
+  { "description": "drive forward while turning right", "raw": "{\"t\":\"drive\",\"seq\":42,\"v\":0.2,\"w\":-0.5}", "expect": { "parses": true, "frame": { "t": "drive", "seq": 42, "v": 0.2, "w": -0.5 } } },
+  { "description": "a stop is a drive at zero", "raw": "{\"t\":\"drive\",\"seq\":43,\"v\":0,\"w\":0}", "expect": { "parses": true, "frame": { "t": "drive", "seq": 43, "v": 0, "w": 0 } } },
+  { "description": "status with the deadman tripped", "raw": "{\"t\":\"status\",\"seq\":43,\"deadman\":true}", "expect": { "parses": true, "frame": { "t": "status", "seq": 43, "deadman": true } } },
+  { "description": "fields nobody asked for are dropped, not passed on", "raw": "{\"t\":\"drive\",\"seq\":44,\"v\":0.1,\"w\":0,\"boost\":9}", "expect": { "parses": true, "frame": { "t": "drive", "seq": 44, "v": 0.1, "w": 0 } } },
+  { "description": "an envelope is not a teleop frame", "raw": "{\"msg_id\":\"01J6G7M8N9P0Q1R2S3T4U5V6A1\",\"kind\":\"CMD\",\"topic\":\"nav.goto\",\"seq\":1,\"payload\":{}}", "expect": { "parses": false } },
+  { "description": "drive without a turn rate", "raw": "{\"t\":\"drive\",\"seq\":45,\"v\":0.2}", "expect": { "parses": false } },
+  { "description": "drive with a speed that is not a number", "raw": "{\"t\":\"drive\",\"seq\":45,\"v\":\"fast\",\"w\":0}", "expect": { "parses": false } },
+  { "description": "drive with a negative seq", "raw": "{\"t\":\"drive\",\"seq\":-1,\"v\":0.2,\"w\":0}", "expect": { "parses": false } },
+  { "description": "hello without a token", "raw": "{\"t\":\"hello\",\"protocol_version\":1}", "expect": { "parses": false } },
+  { "description": "an unknown frame type", "raw": "{\"t\":\"boost\",\"seq\":1}", "expect": { "parses": false } },
+  { "description": "not JSON", "raw": "drive 0.2 0", "expect": { "parses": false } }
+]

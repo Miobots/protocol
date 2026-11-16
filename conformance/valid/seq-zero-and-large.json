@@ -9,8 +9,10 @@
     "topic": "obs.sighting",
     "seq": 4294967295,
     "payload": {
-      "object": "person",
-      "confidence": 0.94
+      "label": "glasses",
+      "aliases": ["chashma", "spectacles"],
+      "confidence": 0.94,
+      "pose": [3.1, -0.4, 0.0]
     }
   },
   "expect": {

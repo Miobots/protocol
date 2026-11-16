@@ -1,0 +1,26 @@
+{
+  "description": "obs.sighting with no aliases array",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C3",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C3",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "EVT",
+    "topic": "obs.sighting",
+    "seq": 500,
+    "payload": {
+      "label": "glasses",
+      "confidence": 0.82,
+      "pose": [
+        3.1,
+        -0.4,
+        0.0
+      ]
+    }
+  },
+  "expect": {
+    "parses": false,
+    "reason": "malformed",
+    "field": "payload"
+  }
+}

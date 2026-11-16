@@ -1,0 +1,19 @@
+{
+  "description": "Valid region.confirm: a human agreeing with a proposed label",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7A6",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7A6",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "region.confirm",
+    "seq": 500,
+    "idem_key": "confirm-01J6G7M8N9P0Q1R2S3T4U5V7A6",
+    "payload": {
+      "region_id": "kitchen"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

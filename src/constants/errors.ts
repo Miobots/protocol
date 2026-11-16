@@ -1,7 +1,3 @@
-/**
- * Protocol and Framing Error Codes.
- */
-
 export const ProtocolErrorCode = {
   ERR_PROTOCOL: 'ERR_PROTOCOL',
   ERR_INVALID_JSON: 'ERR_INVALID_JSON',
@@ -26,10 +22,6 @@ export const ProtocolErrorCode = {
 
 export type ProtocolErrorCode = (typeof ProtocolErrorCode)[keyof typeof ProtocolErrorCode];
 
-/**
- * Standardized Machine-Readable Error Reasons.
- * Conforms to ENVELOPE.md §9 and Conformance Vectors.
- */
 export const ProtocolErrorReason = {
   INVALID_ENVELOPE: 'invalid_envelope',
   UNKNOWN_KIND: 'unknown_kind',
