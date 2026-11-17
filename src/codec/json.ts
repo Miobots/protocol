@@ -206,6 +206,14 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
     });
   }
 
+  // Envelope misuse wins over a malformed payload, as the conformance vector requires.
+  if (candidate['expires_at'] !== undefined && kind !== Kind.CMD) {
+    throw new ProtocolError('Field "expires_at" is only permitted on CMD envelopes', ProtocolErrorCode.ERR_INVALID_EXPIRES_AT, {
+      reason: ProtocolErrorReason.INVALID_ENVELOPE,
+      field: 'expires_at',
+    });
+  }
+
   // One table for every topic that has a runtime check. An ACK answers on the command's topic but
   // carries an AckPayload, so it is not held to the command's shape.
   const guard = own(PayloadGuards, topic);
@@ -237,13 +245,6 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
   if (candidate['expires_at'] !== undefined) {
     if (typeof candidate['expires_at'] !== 'number' || !Number.isFinite(candidate['expires_at'])) {
       throw new ProtocolError('Field "expires_at", if present, must be a number', ProtocolErrorCode.ERR_INVALID_EXPIRES_AT, {
-        reason: ProtocolErrorReason.INVALID_ENVELOPE,
-        field: 'expires_at',
-      });
-    }
-
-    if (candidate['kind'] !== Kind.CMD) {
-      throw new ProtocolError('Field "expires_at" is only permitted on CMD envelopes', ProtocolErrorCode.ERR_INVALID_EXPIRES_AT, {
         reason: ProtocolErrorReason.INVALID_ENVELOPE,
         field: 'expires_at',
       });

@@ -1,5 +1,7 @@
 /** Payloads for the long-running navigation lifecycle. */
 
+import { isNumber, isRecord, isText } from './guards.ts';
+
 export interface NavGotoPayload {
   /** Provide either a named region or map coordinates (`x` and `y`). */
   region?: string;
@@ -7,6 +9,13 @@ export interface NavGotoPayload {
   y?: number;
   yaw?: number;
   goal_id: string;
+}
+
+export function isNavGotoPayload(value: unknown): value is NavGotoPayload {
+  if (!isRecord(value) || !isText(value.goal_id)) return false;
+  const region = isText(value.region);
+  const coordinates = isNumber(value.x) && isNumber(value.y);
+  return (region || coordinates) && (value.yaw === undefined || isNumber(value.yaw));
 }
 
 export interface NavCancelPayload {
