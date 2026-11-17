@@ -1,0 +1,20 @@
+{
+  "description": "Valid ACK completing sys.pair and handing the daemon its own token",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7P3",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7P1",
+    "t_mono_ns": "220000000",
+    "t_wall_ms": 1786412511000,
+    "kind": "ACK",
+    "topic": "sys.pair",
+    "seq": 3,
+    "payload": {
+      "accepted": true,
+      "token": "9f2c1d7e0b6a4c3d8e5f1a2b3c4d5e6f",
+      "name": "stb-laptop"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

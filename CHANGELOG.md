@@ -2,6 +2,13 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-18 — Pairing a laptop daemon (G0.2, S9.2)
+
+- `sys.pair` (Ganglion → Brain, sent instead of `sys.hello` while unpaired) and `sys.pair_confirm` (Synapse → Brain). Both are CMD. The ACK to `sys.pair` arrives once a human confirms the code, and carries the daemon's own `token`.
+- `AckPayload` gains optional `token` and `name`.
+- `isPairPayload` / `isPairConfirmPayload` (exactly six digits) and `PAIRING_CODE_TTL_MS` (5 minutes). The guards are exported for Brain's handler and are not in `PayloadGuards`; Heart never receives these topics, and the Rust decoder accepts them by kind.
+- Three valid vectors. The Rust conformance test still passes.
+
 ## 2026-11-17 — Boundary validation and replay corrections
 
 - The codec rejects non-object payloads and malformed ACKs, including an ACK on a telemetry topic.

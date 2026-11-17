@@ -15,6 +15,8 @@ export const ProtocolDefaults = {
   HEARTBEAT_TIMEOUT_MS: 15000,
   DEFAULT_COMMAND_TIMEOUT_MS: 5000,
   DEFAULT_APPROVAL_TIMEOUT_MS: 60000,
+  /** How long a laptop's pairing code stays valid (G0.2). */
+  PAIRING_CODE_TTL_MS: 5 * 60 * 1000,
   IDEMPOTENCY_TTL_MS: 600000,
   MAX_PAYLOAD_BYTES: 512 * 1024,
   MAX_MESSAGE_BYTES: 512 * 1024,

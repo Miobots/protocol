@@ -181,3 +181,42 @@ export interface KillSwitchPayload {
 export function isKillSwitchPayload(value: unknown): value is KillSwitchPayload {
   return isRecord(value) && typeof value.active === 'boolean';
 }
+
+/**
+ * `sys.pair` (G0.2) — an unpaired laptop daemon asks to be paired, sent **instead of** `sys.hello`.
+ *
+ * The daemon makes the six-digit code and shows it to the human, who types it into the app
+ * (`sys.pair_confirm`). The ACK is the result, and it arrives only once a human confirms or the
+ * code lapses; on success it carries the daemon's own `token`. Finding a device on the network is
+ * never permission to use it.
+ */
+export interface PairPayload {
+  device_id: string;
+  /** Exactly six digits. */
+  code: string;
+  /** What the app shows once paired, e.g. the laptop's hostname. */
+  name: string;
+  protocol_version: number;
+}
+
+/** `sys.pair_confirm` (S9.2) — the app hands Brain the code a human read off the laptop. */
+export interface PairConfirmPayload {
+  code: string;
+}
+
+export const PAIRING_CODE_PATTERN = /^[0-9]{6}$/;
+
+export function isPairPayload(value: unknown): value is PairPayload {
+  return (
+    isRecord(value) &&
+    isText(value.device_id) &&
+    typeof value.code === 'string' &&
+    PAIRING_CODE_PATTERN.test(value.code) &&
+    isText(value.name) &&
+    isNumber(value.protocol_version)
+  );
+}
+
+export function isPairConfirmPayload(value: unknown): value is PairConfirmPayload {
+  return isRecord(value) && typeof value.code === 'string' && PAIRING_CODE_PATTERN.test(value.code);
+}
