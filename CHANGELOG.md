@@ -2,6 +2,12 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-18 — Approval ticket for laptop actions (BRAIN_DECISIONS 27)
+
+- `ApprovalTicket`, `isApprovalTicket` and `APPROVAL_META_KEY` (`"miobots/approval"`): Brain puts the ticket in an MCP `tools/call`'s `params._meta` after a human taps Approve. Ganglion runs an Action-tier tool only against a matching, unexpired, unused ticket.
+- `canonicalJson()`: sorted-key JSON, so Brain and Ganglion hash the same bytes for the same arguments. Pure, because Synapse imports this package; each consumer hashes with its own crypto.
+- No envelope or topic change. Conformance vectors are untouched.
+
 ## 2026-11-18 — Pairing a laptop daemon (G0.2, S9.2)
 
 - `sys.pair` (Ganglion → Brain, sent instead of `sys.hello` while unpaired) and `sys.pair_confirm` (Synapse → Brain). Both are CMD. The ACK to `sys.pair` arrives once a human confirms the code, and carries the daemon's own `token`.
