@@ -2,6 +2,13 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-17 — Boundary validation and replay corrections
+
+- The codec rejects non-object payloads and malformed ACKs, including an ACK on a telemetry topic.
+- Fake Heart refuses malformed `voice.speak` without crashing and gives replayed ACKs a fresh `seq` on each connection.
+- Teleop drops `drive.seq: 0`; drive sequences start at 1.
+- Added eight envelope vectors for the new validation and MCP JSON-RPC parity, plus a teleop vector. The Rust decoder in `miobots-heart/src/mio_gateway` now runs these same vectors.
+
 ## 2026-11-17 — The rest of the registry, the outbox and the teleop contract (P2.5, P2.6, P3.1–P3.3, P4.1–P4.3, P5.1, P5.2)
 
 ### Added

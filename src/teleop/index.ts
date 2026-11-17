@@ -90,7 +90,7 @@ export function parseTeleopFrame(raw: string): TeleopFrame | undefined {
     case 'welcome':
       return isNumber(frame.deadman_ms) && frame.deadman_ms > 0 ? { t: 'welcome', deadman_ms: frame.deadman_ms } : undefined;
     case 'drive':
-      return isCounter(frame.seq) && isNumber(frame.v) && isNumber(frame.w)
+      return isCounter(frame.seq) && frame.seq > 0 && isNumber(frame.v) && isNumber(frame.w)
         ? { t: 'drive', seq: frame.seq, v: frame.v, w: frame.w }
         : undefined;
     case 'status':

@@ -118,4 +118,16 @@ describe('Envelope Codec (encode / decode / parse)', () => {
       assert.equal(result.error.code, ProtocolErrorCode.ERR_INVALID_KIND);
     }
   });
+
+  it('rejects non-object payloads and malformed ACK answers', () => {
+    const command = newEnvelope({
+      kind: Kind.CMD,
+      topic: Topics.VOICE_SPEAK,
+      payload: { text: 'salam', lang: 'ur' },
+      seq: 1,
+    });
+    assert.equal(parse(JSON.stringify({ ...command, payload: null })).success, false);
+    assert.equal(parse(JSON.stringify({ ...command, kind: Kind.ACK, idem_key: undefined, payload: { accepted: 'yes' } })).success, false);
+    assert.equal(parse(JSON.stringify({ ...command, kind: Kind.ACK, idem_key: undefined, topic: Topics.STATE_POSE, payload: { accepted: true } })).success, false);
+  });
 });

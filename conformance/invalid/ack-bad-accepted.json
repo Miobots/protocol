@@ -1,0 +1,14 @@
+{
+  "description": "ACK with accepted as text cannot resolve a command",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7C1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7C2",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "ACK",
+    "topic": "voice.speak",
+    "seq": 1,
+    "payload": { "accepted": "yes" }
+  },
+  "expect": { "parses": false, "reason": "invalid_envelope", "field": "payload" }
+}

@@ -1,0 +1,14 @@
+{
+  "description": "MCP notification must not carry an id",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V8B3",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V8B1",
+    "t_mono_ns": "184030000002",
+    "t_wall_ms": 1786412406002,
+    "kind": "EVT",
+    "topic": "mcp.notification",
+    "seq": 3,
+    "payload": { "jsonrpc": "2.0", "id": 1, "method": "notifications/tools/list_changed" }
+  },
+  "expect": { "parses": false, "reason": "malformed", "field": "payload" }
+}

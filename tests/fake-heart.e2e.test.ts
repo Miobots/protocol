@@ -82,6 +82,14 @@ it('reminders fire with Brain away, then arrive in order and are trimmed only on
     assert.equal(error.env.topic, Topics.SYS_ERROR);
     assert.deepEqual(error.env.payload, { reason: 'unknown_topic', msg_id: stranger.msg_id });
 
+    const badSpeak = newEnvelope({ kind: Kind.CMD, topic: Topics.VOICE_SPEAK, payload: {} as never, seq });
+    send(badSpeak);
+    assert.deepEqual((await ackOf(badSpeak)).env.payload, {
+      accepted: false,
+      reason: 'invalid_speak_payload',
+      exec_status: 'rejected',
+    });
+
     // The same command twice is run once: the second ACK is the first one, replayed (§4).
     const speak = newEnvelope({ kind: Kind.CMD, topic: Topics.VOICE_SPEAK, payload: { text: 'salam', lang: 'ur' }, seq });
     send(speak);
@@ -128,6 +136,13 @@ it('reminders fire with Brain away, then arrive in order and are trimmed only on
     assert.ok(drained[0]!.t_wall_ms <= drained[1]!.t_wall_ms && drained[1]!.t_wall_ms <= drained[2]!.t_wall_ms);
     // A fresh seq on the new connection, with no gap after the hello.
     assert.deepEqual(drained.map((e) => e.seq), [hello2.env.seq + 1, hello2.env.seq + 2, hello2.env.seq + 3]);
+
+    send({ ...speak, seq: seq.next() });
+    const replay = await expectFromRobot('the replayed ACK after reconnect', (r) =>
+      r.connection === 2 && r.env.kind === Kind.ACK && r.env.corr_id === speak.corr_id);
+    assert.equal(replay.env.msg_id, speakAcks[0]!.env.msg_id);
+    const prior = received.filter((r) => r.connection === 2 && r !== replay).at(-1)!;
+    assert.equal(replay.env.seq, prior.env.seq + 1);
 
     // Brain confirms them. A command behind the receipt proves the robot has processed it.
     send(newEnvelope({ kind: Kind.ACK, topic: Topics.SYS_RECEIPT, seq, payload: { msg_ids: drained.map((e) => e.msg_id) } }));

@@ -1,0 +1,14 @@
+{
+  "description": "MCP JSON-RPC notification inside an event",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V8A3",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V8A1",
+    "t_mono_ns": "184030000002",
+    "t_wall_ms": 1786412406002,
+    "kind": "EVT",
+    "topic": "mcp.notification",
+    "seq": 3,
+    "payload": { "jsonrpc": "2.0", "method": "notifications/tools/list_changed" }
+  },
+  "expect": { "parses": true }
+}
