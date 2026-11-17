@@ -5,6 +5,7 @@
 import { Kind } from '../constants/index.ts';
 import { isFaultPayload } from './diag.ts';
 import { isMapSnapshotPayload, isRegionConfirmPayload, isRegionPayload, isZonePayload } from './map.ts';
+import { isBatteryPayload, isPosePayload } from './state.ts';
 import { validateMCPNotification, validateMCPRequest, validateMCPResponse } from './mcp.ts';
 import { isSightingPayload } from './obs.ts';
 import { isSchedFiredPayload, isSchedWindowPayload } from './sched.ts';
@@ -152,6 +153,8 @@ export const PayloadGuards: Partial<Record<TopicName, (payload: unknown) => bool
   'obs.sighting': isSightingPayload,
   'diag.fault': isFaultPayload,
   'map.snapshot': isMapSnapshotPayload,
+  'state.pose': isPosePayload,
+  'state.battery': isBatteryPayload,
   'region.upsert': isRegionPayload,
   'region.confirm': isRegionConfirmPayload,
   'zone.upsert': isZonePayload,

@@ -23,6 +23,9 @@ import {
   parse,
   SequenceCounter,
   HeartCapabilities,
+  MapCell,
+  encodeCells,
+  isNavGotoPayload,
   queuesInOutbox,
   isReceiptPayload,
   isSpeakPayload,
@@ -35,6 +38,8 @@ import {
   type NavCancelPayload,
   type NavGotoPayload,
   type NavResultPayload,
+  type PosePayload,
+  type MapSnapshotPayload,
   type SchedWindowPayload,
   type ScheduleOccurrence,
   type SightingPayload,
@@ -67,6 +72,7 @@ let ws: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let capabilityTimer: NodeJS.Timeout | null = null;
+let poseTimer: NodeJS.Timeout | null = null;
 let navigationTimer: NodeJS.Timeout | null = null;
 let sightingTimer: NodeJS.Timeout | null = null;
 let backoffDelayMs: number = ProtocolDefaults.RECONNECT_INITIAL_DELAY_MS;
@@ -86,9 +92,23 @@ interface ActiveNavigation {
   distanceRemainingM: number;
   startedAtMs: number;
   finalPose: NavResultPayload['final_pose'];
+  startPose: PosePayload;
 }
 
 let activeNavigation: ActiveNavigation | null = null;
+let currentPose: PosePayload = { x: 2, y: 2, yaw: 0, confidence: 0.9 };
+
+const DEMO_MAP: MapSnapshotPayload = {
+  width: 32,
+  height: 32,
+  resolution: 0.25,
+  origin: { x: 0, y: 0 },
+  cells: encodeCells(Uint8Array.from({ length: 32 * 32 }, (_, i) => {
+    const x = i % 32;
+    const y = Math.floor(i / 32);
+    return x === 0 || x === 31 || y === 0 || y === 31 ? MapCell.OCCUPIED : MapCell.FREE;
+  })),
+};
 
 function log(message: string): void {
   const time = new Date().toISOString().substring(11, 23);
@@ -314,6 +334,10 @@ function cleanupTimers(): void {
     clearInterval(capabilityTimer);
     capabilityTimer = null;
   }
+  if (poseTimer) {
+    clearInterval(poseTimer);
+    poseTimer = null;
+  }
 }
 
 function stopNavigation(): void {
@@ -322,19 +346,6 @@ function stopNavigation(): void {
     navigationTimer = null;
   }
   activeNavigation = null;
-}
-
-export function isNavGotoPayload(value: unknown): value is NavGotoPayload {
-  if (!isRecord(value) || typeof value.goal_id !== 'string' || value.goal_id.length === 0) return false;
-
-  const hasRegion = typeof value.region === 'string' && value.region.length > 0;
-  const hasCoordinates = typeof value.x === 'number'
-    && Number.isFinite(value.x)
-    && typeof value.y === 'number'
-    && Number.isFinite(value.y);
-  const hasValidYaw = value.yaw === undefined || (typeof value.yaw === 'number' && Number.isFinite(value.yaw));
-
-  return (hasRegion || hasCoordinates) && hasValidYaw;
 }
 
 export function navigationPayloadReason(value: unknown): 'invalid_navigation_payload' | undefined {
@@ -389,6 +400,7 @@ function startNavigation(payload: NavGotoPayload, corrId: string): void {
       y: payload.y ?? 0,
       yaw: payload.yaw ?? 0,
     },
+    startPose: { ...currentPose },
   };
 
   navigationTimer = setInterval(() => {
@@ -401,6 +413,15 @@ function startNavigation(payload: NavGotoPayload, corrId: string): void {
 
     activeNavigation.distanceRemainingM = Math.max(0, activeNavigation.distanceRemainingM - 1);
     const navigation = activeNavigation;
+    if (payload.x !== undefined && payload.y !== undefined) {
+      const fraction = 1 - navigation.distanceRemainingM / NAV_START_DISTANCE_M;
+      currentPose = {
+        x: navigation.startPose.x + (payload.x - navigation.startPose.x) * fraction,
+        y: navigation.startPose.y + (payload.y - navigation.startPose.y) * fraction,
+        yaw: Math.atan2(payload.y - navigation.startPose.y, payload.x - navigation.startPose.x),
+        confidence: 0.9,
+      };
+    }
     const feedback = newEnvelope({
       kind: Kind.EVT,
       topic: Topics.NAV_FEEDBACK,
@@ -444,6 +465,7 @@ function startHeartbeat(): void {
       },
     });
     sendEnvelope(heartbeatEnv);
+    sendBattery();
 
     // 2. Drop idempotency entries past their TTL (piggy-backed on this tick, no extra timer)
     pruneIdempotencyCache();
@@ -460,6 +482,35 @@ function startHeartbeat(): void {
       ws.terminate();
     }
   }, ProtocolDefaults.HEARTBEAT_INTERVAL_MS);
+}
+
+function sendBattery(): void {
+  sendEnvelope(newEnvelope({
+    kind: Kind.TELEM,
+    topic: Topics.STATE_BATTERY,
+    seq: outboundSeq,
+    payload: { percentage: refuseNav ? REFUSAL_BATTERY_PCT : 95, voltage: 12.2, is_charging: false },
+  }));
+}
+
+function startPoseTelemetry(): void {
+  const sendPose = () => sendEnvelope(newEnvelope({
+    kind: Kind.TELEM,
+    topic: Topics.STATE_POSE,
+    seq: outboundSeq,
+    payload: currentPose,
+  }));
+  sendPose();
+  poseTimer = setInterval(sendPose, 200);
+}
+
+function sendMapSnapshot(): void {
+  sendEnvelope(newEnvelope({
+    kind: Kind.TELEM,
+    topic: Topics.MAP_SNAPSHOT,
+    seq: outboundSeq,
+    payload: DEMO_MAP,
+  }));
 }
 
 function sendCapabilities(): void {
@@ -497,6 +548,7 @@ function publishCapabilities(): void {
     },
   });
   sendEnvelope(capabilityEnv);
+  sendMapSnapshot();
 }
 
 /**
@@ -593,6 +645,8 @@ export function connect(): void {
         drainOutbox();
         startHeartbeat();
         sendCapabilities();
+        sendBattery();
+        startPoseTelemetry();
       } else {
         log(`Handshake rejected by Brain: ${welcome.reason || 'Unauthorized'}. Closing socket.`);
         cleanupTimers();

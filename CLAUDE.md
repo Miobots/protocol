@@ -85,7 +85,7 @@ See the vault's `STATUS.md` for the project's state; this covers only what is tr
 - `bun run bench` — what the JSON codec costs; measured on a laptop, not yet on the Pi
 - `TEACHER.md` — a local study guide, gitignored
 
-**Not here yet:** Brain does not send `sys.receipt`, so today the Fake Heart re-sends every unconfirmed event on each reconnect. Nothing deletes a region or a zone. The Fake Heart sends no `state.pose`, `state.battery` or `map.snapshot`.
+**Not here yet:** Brain does not send `sys.receipt`, so today the Fake Heart re-sends every unconfirmed event on each reconnect. Nothing deletes a region or a zone.
 
 **Consumers must re-run `bun install` after any change here** — a `file:` dependency is linked as per-file symlinks at install time.
 

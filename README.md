@@ -113,6 +113,7 @@ The simulator (`src/simulator/fake-heart.ts`) mimics a real MioBots robot for te
 - **Receiver-Side Expiry:** Commands arriving past `expires_at` are rejected with `accepted: false, reason: "expired"`.
 - **Receiver-Side Idempotency:** Duplicate `idem_key` payloads replay their cached `ACK` without re-executing.
 - **Navigation Simulation:** Simulates drives with periodic feedback (0.5 s ticks), supports cancellation, and allows interactive refusal testing. A drive carries on when Brain goes away.
+- **Demo telemetry:** Publishes a 32×32 map every 10 s, pose at 5 Hz, and battery every 5 s for Synapse testing. This map is simulated, not a SLAM map.
 - **Its Own Schedule:** Caches a `sched.window`, sets its own timers, and announces reminders on time even with Brain switched off — once per `occurrence_id`, however often the window is pushed again.
 - **Outbox:** Events wait while Brain is unreachable, go out oldest-first on reconnect with their original timestamps, and are deleted only when Brain names them in a `sys.receipt`. In memory, capped at 1,000.
 - **Invented Sightings:** With `FAKE_HEART_SIGHTINGS=true`, emits an `obs.sighting` every 5 s from a fixed list (glasses, keys, wallet, medicine).

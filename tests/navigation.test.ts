@@ -26,6 +26,7 @@ describe('Fake Heart navigation payload validation', () => {
       distanceRemainingM: 2,
       startedAtMs: Date.now(),
       finalPose: { x: 3.2, y: -1.1, yaw: 1.57 } satisfies NavResultPayload['final_pose'],
+      startPose: { x: 2, y: 2, yaw: 0, confidence: 0.9 },
     };
 
     assert.equal(navigationCancelReason(active, 'g-99'), 'goal_not_found');
