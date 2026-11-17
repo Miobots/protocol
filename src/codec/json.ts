@@ -1,6 +1,6 @@
 import { Kind, ProtocolErrorCode, ProtocolErrorReason, ProtocolDefaults } from '../constants/index.ts';
 import { ProtocolError, type Envelope } from '../envelope/types.ts';
-import { PayloadGuards, TopicAllowedKinds } from '../topics/index.ts';
+import { PayloadGuards, TopicAllowedKinds, isReceiptPayload } from '../topics/index.ts';
 
 const VALID_KINDS = new Set<string>(Object.values(Kind));
 const DIGITS_ONLY = /^\d+$/;
@@ -141,7 +141,7 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
   const topic = candidate['topic'];
   const kind = candidate['kind'];
   const allowedKinds = own<readonly Kind[]>(TopicAllowedKinds, topic);
-  if (allowedKinds && kind !== Kind.ACK && !allowedKinds.includes(kind as Kind)) {
+  if (allowedKinds && !allowedKinds.includes(kind as Kind) && !(kind === Kind.ACK && allowedKinds.includes(Kind.CMD))) {
     throw new ProtocolError('Envelope kind is not valid for this topic', ProtocolErrorCode.ERR_INVALID_TOPIC, {
       reason: ProtocolErrorReason.INVALID_ENVELOPE,
       field: 'kind',
@@ -169,6 +169,25 @@ export function validateEnvelope<TTopic extends string = string, TPayload = unkn
       reason: ProtocolErrorReason.INVALID_ENVELOPE,
       field: 'payload',
     });
+  }
+
+  if (typeof candidate['payload'] !== 'object' || candidate['payload'] === null || Array.isArray(candidate['payload'])) {
+    throw new ProtocolError('Field "payload" must be an object', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+      reason: ProtocolErrorReason.INVALID_ENVELOPE,
+      field: 'payload',
+    });
+  }
+
+  if (kind === Kind.ACK) {
+    const validAck = topic === 'sys.receipt'
+      ? isReceiptPayload(candidate['payload'])
+      : typeof (candidate['payload'] as Record<string, unknown>)['accepted'] === 'boolean';
+    if (!validAck) {
+      throw new ProtocolError('Invalid ACK payload', ProtocolErrorCode.ERR_INVALID_ENVELOPE_TYPE, {
+        reason: ProtocolErrorReason.INVALID_ENVELOPE,
+        field: 'payload',
+      });
+    }
   }
 
   try {

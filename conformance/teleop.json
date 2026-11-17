@@ -9,6 +9,7 @@
   { "description": "drive without a turn rate", "raw": "{\"t\":\"drive\",\"seq\":45,\"v\":0.2}", "expect": { "parses": false } },
   { "description": "drive with a speed that is not a number", "raw": "{\"t\":\"drive\",\"seq\":45,\"v\":\"fast\",\"w\":0}", "expect": { "parses": false } },
   { "description": "drive with a negative seq", "raw": "{\"t\":\"drive\",\"seq\":-1,\"v\":0.2,\"w\":0}", "expect": { "parses": false } },
+  { "description": "drive starts at seq one, not zero", "raw": "{\"t\":\"drive\",\"seq\":0,\"v\":0.2,\"w\":0}", "expect": { "parses": false } },
   { "description": "hello without a token", "raw": "{\"t\":\"hello\",\"protocol_version\":1}", "expect": { "parses": false } },
   { "description": "an unknown frame type", "raw": "{\"t\":\"boost\",\"seq\":1}", "expect": { "parses": false } },
   { "description": "not JSON", "raw": "drive 0.2 0", "expect": { "parses": false } }

@@ -173,9 +173,9 @@ miobots-protocol/
 │   └── simulator/            # Canonical Fake Heart robot simulator
 │       └── fake-heart.ts     # Simulator implementation with WebSocket dialout
 ├── conformance/              # Cross-language wire test vectors
-│   ├── valid/                # 26 canonical valid envelope vectors
-│   ├── invalid/              # 25 canonical invalid envelope vectors
-│   └── teleop.json           # 13 teleop frame vectors
+│   ├── valid/                # 29 canonical valid envelope vectors
+│   ├── invalid/              # 30 canonical invalid envelope vectors
+│   └── teleop.json           # 14 teleop frame vectors
 ├── bench/
 │   └── codec.bench.ts        # Encode + decode cost per message (bun run bench)
 ├── tests/                    # Bun test suite

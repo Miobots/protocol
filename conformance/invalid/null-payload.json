@@ -1,0 +1,15 @@
+{
+  "description": "A payload must be an object, not null",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7D1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7D2",
+    "t_mono_ns": "184030000000",
+    "t_wall_ms": 1786412406000,
+    "kind": "CMD",
+    "topic": "voice.speak",
+    "seq": 1,
+    "idem_key": "speak-null-payload",
+    "payload": null
+  },
+  "expect": { "parses": false, "reason": "invalid_envelope", "field": "payload" }
+}

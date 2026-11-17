@@ -64,7 +64,7 @@ Later it becomes the CI fixture rather than being thrown away.
 
 ```bash
 bun install
-bun test         # Runs full unit and cross-language conformance test suites
+bun test         # Runs unit tests and the TypeScript half of conformance
 bun run typecheck
 bun run sim      # Starts the canonical Fake Heart simulator
 ```
@@ -81,7 +81,7 @@ See the vault's `STATUS.md` for the project's state; this covers only what is tr
 - Shared capability IDs for both manifest halves (`src/topics/capability.ts`)
 - Teleop frames, deliberately not envelopes (`src/teleop/`, spec in `TELEOP.md`)
 - Canonical Fake Heart: heartbeat watchdog, jittered backoff, receiver-side idempotency and expiry, navigation, its own reminder schedule, an in-memory outbox, invented sightings, and the robot's half of `cap.manifest` on connect and every 10 s (`src/simulator/fake-heart.ts`)
-- 51 envelope vectors and 13 teleop vectors (`conformance/`) — read only by the TypeScript suite until `mio_gateway` exists
+- 59 envelope vectors and 14 teleop vectors (`conformance/`) — both the TypeScript suite here and the Rust decoder tests in `miobots-heart/src/mio_gateway` read them
 - `bun run bench` — what the JSON codec costs; measured on a laptop, not yet on the Pi
 - `TEACHER.md` — a local study guide, gitignored
 

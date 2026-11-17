@@ -25,10 +25,10 @@ import {
   HeartCapabilities,
   queuesInOutbox,
   isReceiptPayload,
+  isSpeakPayload,
   type Envelope,
   type HelloPayload,
   type WelcomePayload,
-  type SpeakPayload,
   type HeartbeatPayload,
   type CapabilityManifestPayload,
   type AckPayload,
@@ -517,7 +517,7 @@ function answer(env: Envelope, payload: AckPayload): void {
 function answeredAlready(env: Envelope): boolean {
   const replayed = replayIfSeen(env.idem_key);
   if (replayed) {
-    sendEnvelope(replayed);
+    sendEnvelope({ ...replayed, seq: outboundSeq.next() });
     log(`Duplicate idem_key=${env.idem_key} — replayed the original ${env.topic} ACK, did not run it again`);
     return true;
   }
@@ -675,7 +675,11 @@ export function connect(): void {
 
     // Handle voice.speak command
     if (env.topic === Topics.VOICE_SPEAK && env.kind === Kind.CMD) {
-      const speak = env.payload as SpeakPayload;
+      if (!isSpeakPayload(env.payload)) {
+        answer(env, { accepted: false, reason: 'invalid_speak_payload', exec_status: ExecutionStatus.REJECTED });
+        return;
+      }
+      const speak = env.payload;
       const lang = speak.lang || Language.EN;
       const priority = speak.priority || Priority.NORMAL;
       console.log(`\n🔊 [SPEAK ${lang}] "${speak.text}" (priority: ${priority})\n`);
