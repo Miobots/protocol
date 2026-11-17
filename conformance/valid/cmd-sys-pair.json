@@ -1,0 +1,23 @@
+{
+  "description": "Valid sys.pair from an unpaired laptop daemon, sent instead of sys.hello",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7P1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7P1",
+    "t_mono_ns": "200000000",
+    "t_wall_ms": 1786412500000,
+    "kind": "CMD",
+    "topic": "sys.pair",
+    "seq": 1,
+    "idem_key": "pair-laptop-1",
+    "expires_at": 1786412800000,
+    "payload": {
+      "device_id": "laptop-1",
+      "code": "418902",
+      "name": "stb-laptop",
+      "protocol_version": 1
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

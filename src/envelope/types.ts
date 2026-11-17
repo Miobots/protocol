@@ -60,6 +60,12 @@ export interface AckPayload {
   /** Navigation goal identifier when an ACK accepts a navigation command. */
   goal_id?: string;
 
+  /** The daemon's own token, on the ACK that completes a `sys.pair`. Sent once, never stored in clear by Brain. */
+  token?: string;
+
+  /** The paired device's display name, on the ACK to `sys.pair_confirm`. */
+  name?: string;
+
   /** Additional structured diagnostic details. */
   details?: Record<string, unknown>;
 }
