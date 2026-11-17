@@ -24,3 +24,15 @@ describe('pairing topics (G0.2)', () => {
     assert.equal(isPairPayload({ device_id: 'd', code: '418902', protocol_version: 1 }), false);
   });
 });
+
+describe('sys.devices (S9.2)', () => {
+  it('is an event listing paired laptops', async () => {
+    const { isDevicesPayload } = await import('../src/index.ts');
+    assert.equal(TopicKind[Topics.SYS_DEVICES], Kind.EVT);
+    const device = { device_id: 'stb-laptop', name: 'stb-laptop', paired_at: '2026-11-18T03:38:05Z', online: true };
+    assert.ok(isDevicesPayload({ devices: [device] }));
+    assert.ok(isDevicesPayload({ devices: [] }));
+    assert.equal(isDevicesPayload({ devices: [{ ...device, online: 'yes' }] }), false);
+    assert.equal(isDevicesPayload({}), false);
+  });
+});

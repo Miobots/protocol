@@ -2,6 +2,11 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-18 — Paired devices for the app (S9.2)
+
+- `sys.devices` (EVT, Brain → Synapse): the paired laptops, each with `device_id`, `name`, `paired_at` and `online`. It never carries a token or its hash. Sent when an app connects and whenever a pairing or a laptop's connection changes. `isDevicesPayload` is exported for the app and is not in `PayloadGuards`, the same as the pairing topics.
+- One valid vector. The Rust conformance test still passes.
+
 ## 2026-11-18 — Approval ticket for laptop actions (BRAIN_DECISIONS 27)
 
 - `ApprovalTicket`, `isApprovalTicket` and `APPROVAL_META_KEY` (`"miobots/approval"`): Brain puts the ticket in an MCP `tools/call`'s `params._meta` after a human taps Approve. Ganglion runs an Action-tier tool only against a matching, unexpired, unused ticket.
