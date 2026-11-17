@@ -2,6 +2,11 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-18 — Push token for approval notifications (BRAIN_DECISIONS 28)
+
+- `sys.push_token` (CMD, Synapse → Brain): the app's Expo push token, or `""` to unregister. With it, Brain can tell a phone whose app is closed that an approval is waiting. The push carries no arguments. `isPushTokenPayload` accepts only `ExponentPushToken[…]` / `ExpoPushToken[…]`, so the Brain can never be pointed at an arbitrary URL.
+- One valid vector. The Rust conformance test still passes.
+
 ## 2026-11-18 — Paired devices for the app (S9.2)
 
 - `sys.devices` (EVT, Brain → Synapse): the paired laptops, each with `device_id`, `name`, `paired_at` and `online`. It never carries a token or its hash. Sent when an app connects and whenever a pairing or a laptop's connection changes. `isDevicesPayload` is exported for the app and is not in `PayloadGuards`, the same as the pairing topics.

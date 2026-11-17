@@ -1,0 +1,20 @@
+{
+  "description": "Valid sys.push_token: where the Brain may send a push for this app",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7T1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7T1",
+    "t_mono_ns": "240000000",
+    "t_wall_ms": 1786412530000,
+    "kind": "CMD",
+    "topic": "sys.push_token",
+    "seq": 9,
+    "idem_key": "push-token-synapse-app",
+    "payload": {
+      "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "platform": "android"
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

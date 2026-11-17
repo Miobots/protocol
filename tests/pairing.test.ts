@@ -36,3 +36,15 @@ describe('sys.devices (S9.2)', () => {
     assert.equal(isDevicesPayload({}), false);
   });
 });
+
+describe('sys.push_token', () => {
+  it('accepts an Expo push token or an empty one, and nothing else', async () => {
+    const { isPushTokenPayload } = await import('../src/index.ts');
+    assert.equal(TopicKind[Topics.SYS_PUSH_TOKEN], Kind.CMD);
+    assert.ok(isPushTokenPayload({ token: 'ExponentPushToken[abc_DEF-123]', platform: 'android' }));
+    assert.ok(isPushTokenPayload({ token: 'ExpoPushToken[abc]', platform: 'ios' }));
+    assert.ok(isPushTokenPayload({ token: '', platform: 'android' }));
+    assert.equal(isPushTokenPayload({ token: 'https://evil.example/hook', platform: 'android' }), false);
+    assert.equal(isPushTokenPayload({ token: 'ExponentPushToken[abc]', platform: 'web' }), false);
+  });
+});

@@ -251,3 +251,26 @@ export function isDevicesPayload(value: unknown): value is DevicesPayload {
       typeof device.online === 'boolean')
   );
 }
+
+/**
+ * `sys.push_token` — Synapse → Brain: where to send a push notification for this app, so an
+ * approval reaches a phone whose app is closed. The push itself only says that something is
+ * waiting; the exact arguments and the Approve button stay in the app (BRAIN_DECISIONS 28).
+ * An empty `token` means "stop sending pushes to this app".
+ */
+export interface PushTokenPayload {
+  /** An Expo push token, `ExponentPushToken[...]`, or "" to unregister. */
+  token: string;
+  platform: 'android' | 'ios';
+}
+
+export const EXPO_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$/;
+
+export function isPushTokenPayload(value: unknown): value is PushTokenPayload {
+  return (
+    isRecord(value) &&
+    typeof value.token === 'string' &&
+    (value.token === '' || EXPO_PUSH_TOKEN_PATTERN.test(value.token)) &&
+    (value.platform === 'android' || value.platform === 'ios')
+  );
+}
