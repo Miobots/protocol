@@ -220,3 +220,57 @@ export function isPairPayload(value: unknown): value is PairPayload {
 export function isPairConfirmPayload(value: unknown): value is PairConfirmPayload {
   return isRecord(value) && typeof value.code === 'string' && PAIRING_CODE_PATTERN.test(value.code);
 }
+
+/** One paired laptop, as the app lists it (S9.2). Never carries a token or its hash. */
+export interface PairedDevice {
+  device_id: string;
+  name: string;
+  /** ISO 8601. */
+  paired_at: string;
+  /** Connected to the Brain right now. */
+  online: boolean;
+}
+
+/**
+ * `sys.devices` — Brain → Synapse, the laptops paired with this home. Sent when an app connects
+ * and whenever a pairing or a laptop's connection changes; each one replaces the last.
+ */
+export interface DevicesPayload {
+  devices: PairedDevice[];
+}
+
+export function isDevicesPayload(value: unknown): value is DevicesPayload {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.devices) &&
+    value.devices.every((device: unknown) =>
+      isRecord(device) &&
+      isText(device.device_id) &&
+      isText(device.name) &&
+      isText(device.paired_at) &&
+      typeof device.online === 'boolean')
+  );
+}
+
+/**
+ * `sys.push_token` — Synapse → Brain: where to send a push notification for this app, so an
+ * approval reaches a phone whose app is closed. The push itself only says that something is
+ * waiting; the exact arguments and the Approve button stay in the app (BRAIN_DECISIONS 28).
+ * An empty `token` means "stop sending pushes to this app".
+ */
+export interface PushTokenPayload {
+  /** An Expo push token, `ExponentPushToken[...]`, or "" to unregister. */
+  token: string;
+  platform: 'android' | 'ios';
+}
+
+export const EXPO_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$/;
+
+export function isPushTokenPayload(value: unknown): value is PushTokenPayload {
+  return (
+    isRecord(value) &&
+    typeof value.token === 'string' &&
+    (value.token === '' || EXPO_PUSH_TOKEN_PATTERN.test(value.token)) &&
+    (value.platform === 'android' || value.platform === 'ios')
+  );
+}

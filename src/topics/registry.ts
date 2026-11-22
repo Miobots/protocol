@@ -19,7 +19,7 @@ import type {
   HelloPayload,
   KillSwitchPayload,
   ReceiptPayload,
-  WelcomePayload, PairConfirmPayload, PairPayload } from './sys.ts';
+  WelcomePayload, PairConfirmPayload, PairPayload, DevicesPayload, PushTokenPayload } from './sys.ts';
 import type { SpeakPayload } from './voice.ts';
 import type { CapabilityManifestPayload } from './capability.ts';
 import type {
@@ -52,6 +52,8 @@ export interface TopicPayloadMap {
   'sys.killswitch': KillSwitchPayload;
   'sys.pair': PairPayload;
   'sys.pair_confirm': PairConfirmPayload;
+  'sys.devices': DevicesPayload;
+  'sys.push_token': PushTokenPayload;
   'voice.speak': SpeakPayload;
   'nav.goto': NavGotoPayload;
   'nav.cancel': NavCancelPayload;

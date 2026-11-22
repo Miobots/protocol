@@ -27,6 +27,8 @@ export const Topics = {
   // Pairing a laptop daemon (G0.2)
   SYS_PAIR: 'sys.pair',
   SYS_PAIR_CONFIRM: 'sys.pair_confirm',
+  SYS_DEVICES: 'sys.devices',
+  SYS_PUSH_TOKEN: 'sys.push_token',
 
   // Voice Interaction
   VOICE_SPEAK: 'voice.speak',
@@ -91,6 +93,8 @@ export const TopicKind: Record<TopicName, Kind> = {
   'sys.killswitch': Kind.CMD,
   'sys.pair': Kind.CMD,
   'sys.pair_confirm': Kind.CMD,
+  'sys.devices': Kind.EVT,
+  'sys.push_token': Kind.CMD,
   'voice.speak': Kind.CMD,
   'nav.goto': Kind.CMD,
   'nav.cancel': Kind.CMD,
@@ -124,6 +128,8 @@ export const TopicAllowedKinds: Record<TopicName, readonly Kind[]> = {
   'sys.killswitch': [Kind.CMD],
   'sys.pair': [Kind.CMD],
   'sys.pair_confirm': [Kind.CMD],
+  'sys.devices': [Kind.EVT],
+  'sys.push_token': [Kind.CMD],
   'voice.speak': [Kind.CMD],
   'nav.goto': [Kind.CMD],
   'nav.cancel': [Kind.CMD],
