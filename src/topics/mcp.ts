@@ -86,3 +86,46 @@ export function validateMCPNotification(value: unknown): value is MCPNotificatio
   return value.jsonrpc === "2.0" && typeof value.method === "string" && value.method.length > 0 &&
     validParams(value.params);
 }
+/**
+ * Proof, carried in a `tools/call` request's `params._meta`, that a human approved this exact
+ * Action-tier call (BRAIN_DECISIONS 27). Brain attaches it after a tap on the phone; Ganglion runs
+ * the action only if the tool and a hash of the exact arguments match, it has not expired, and its
+ * id has not been used before. Voice can never produce one.
+ */
+export interface ApprovalTicket {
+  approval_id: string;
+  /** Device id of the app connection whose ACK approved it. Who approved comes from the token on that connection. */
+  approved_by: string;
+  /** The tool's own name on the daemon, e.g. `open_app_or_url`. */
+  tool: string;
+  /** Hex SHA-256 of `canonicalJson(arguments)`. */
+  args_sha256: string;
+  /** Unix epoch ms. */
+  expires_at: number;
+}
+
+export const APPROVAL_META_KEY = "miobots/approval";
+
+/**
+ * JSON with object keys sorted at every level, so two sides that built the same arguments in a
+ * different order hash the same bytes. Pure on purpose: the app imports this package too, so the
+ * hashing itself stays with each consumer.
+ */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+export function isApprovalTicket(value: unknown): value is ApprovalTicket {
+  return (
+    isRecord(value) &&
+    typeof value.approval_id === "string" && value.approval_id.length > 0 &&
+    typeof value.approved_by === "string" && value.approved_by.length > 0 &&
+    typeof value.tool === "string" && value.tool.length > 0 &&
+    typeof value.args_sha256 === "string" && /^[0-9a-f]{64}$/.test(value.args_sha256) &&
+    typeof value.expires_at === "number" && Number.isFinite(value.expires_at)
+  );
+}
