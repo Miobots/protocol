@@ -29,6 +29,7 @@ export const Topics = {
   SYS_PAIR_CONFIRM: 'sys.pair_confirm',
   SYS_DEVICES: 'sys.devices',
   SYS_PUSH_TOKEN: 'sys.push_token',
+  SYS_AUDIT: 'sys.audit',
 
   // Voice Interaction
   VOICE_SPEAK: 'voice.speak',
@@ -95,6 +96,7 @@ export const TopicKind: Record<TopicName, Kind> = {
   'sys.pair_confirm': Kind.CMD,
   'sys.devices': Kind.EVT,
   'sys.push_token': Kind.CMD,
+  'sys.audit': Kind.CMD,
   'voice.speak': Kind.CMD,
   'nav.goto': Kind.CMD,
   'nav.cancel': Kind.CMD,
@@ -130,6 +132,7 @@ export const TopicAllowedKinds: Record<TopicName, readonly Kind[]> = {
   'sys.pair_confirm': [Kind.CMD],
   'sys.devices': [Kind.EVT],
   'sys.push_token': [Kind.CMD],
+  'sys.audit': [Kind.CMD],
   'voice.speak': [Kind.CMD],
   'nav.goto': [Kind.CMD],
   'nav.cancel': [Kind.CMD],

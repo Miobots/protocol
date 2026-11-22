@@ -2,6 +2,13 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-23 — Audit log and kill switch state (B5.4, B5.6, S5.2)
+
+- `sys.audit` (CMD, Synapse → Brain) asks for the newest rows of Brain's hash-chained log. The ACK carries `audit`: `AuditView` with `entries` (`AuditEntry`: id, time, event, tool, args, `approved_by`, `prev_hash`, `hash`) and `chain` (`ok`, `checked`, `first_bad_id`). `AckPayload` gains optional `audit`. Guards `isAuditRequestPayload` and `isAuditView`.
+- `sys.devices` gains optional `killswitch_active`, so the app shows the kill switch from the event it already receives.
+- `sys.killswitch` is unchanged; it now goes Synapse → Brain only, and Brain enforces it by refusing laptops.
+- Four valid vectors. The Rust conformance test still passes.
+
 ## 2026-11-18 — Push token for approval notifications (BRAIN_DECISIONS 28)
 
 - `sys.push_token` (CMD, Synapse → Brain): the app's Expo push token, or `""` to unregister. With it, Brain can tell a phone whose app is closed that an approval is waiting. The push carries no arguments. `isPushTokenPayload` accepts only `ExponentPushToken[…]` / `ExpoPushToken[…]`, so the Brain can never be pointed at an arbitrary URL.

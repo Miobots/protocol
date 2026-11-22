@@ -237,6 +237,8 @@ export interface PairedDevice {
  */
 export interface DevicesPayload {
   devices: PairedDevice[];
+  /** The app's kill switch is on: no laptop may connect and `ask_laptop` refuses (B5.6). */
+  killswitch_active?: boolean;
 }
 
 export function isDevicesPayload(value: unknown): value is DevicesPayload {
@@ -248,7 +250,8 @@ export function isDevicesPayload(value: unknown): value is DevicesPayload {
       isText(device.device_id) &&
       isText(device.name) &&
       isText(device.paired_at) &&
-      typeof device.online === 'boolean')
+      typeof device.online === 'boolean') &&
+    (value.killswitch_active === undefined || typeof value.killswitch_active === 'boolean')
   );
 }
 
@@ -272,5 +275,62 @@ export function isPushTokenPayload(value: unknown): value is PushTokenPayload {
     typeof value.token === 'string' &&
     (value.token === '' || EXPO_PUSH_TOKEN_PATTERN.test(value.token)) &&
     (value.platform === 'android' || value.platform === 'ios')
+  );
+}
+
+/**
+ * `sys.audit` — Synapse → Brain: show me the tamper-evident log (S5.2). The ACK carries `audit`.
+ * The app shows it and never stores it; a copy of a tamper-evident log defeats its purpose.
+ */
+export interface AuditRequestPayload {
+  /** Newest rows to return; Brain caps it. */
+  limit?: number;
+}
+
+export function isAuditRequestPayload(value: unknown): value is AuditRequestPayload {
+  return isRecord(value) && (value.limit === undefined || (isNumber(value.limit) && value.limit > 0));
+}
+
+export type AuditEvent = 'tool_call' | 'killswitch_on' | 'killswitch_off';
+
+/** One row of Brain's hash-chained log (B5.4). `hash` covers this row and `prev_hash`. */
+export interface AuditEntry {
+  id: number;
+  at_ms: number;
+  event: AuditEvent;
+  tool?: string;
+  args?: JsonObject;
+  /** The app that tapped Approve. Absent for read tools, which need no approval. */
+  approved_by?: string;
+  prev_hash: string;
+  hash: string;
+}
+
+/** The answer to `sys.audit`: the newest rows, and whether the whole chain still verifies (B5.5). */
+export interface AuditView {
+  entries: AuditEntry[];
+  chain: { ok: boolean; checked: number; first_bad_id?: number };
+}
+
+const AUDIT_EVENTS: readonly string[] = ['tool_call', 'killswitch_on', 'killswitch_off'];
+
+export function isAuditView(value: unknown): value is AuditView {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.entries) &&
+    value.entries.every((entry: unknown) =>
+      isRecord(entry) &&
+      isNumber(entry.id) &&
+      isNumber(entry.at_ms) &&
+      typeof entry.event === 'string' && AUDIT_EVENTS.includes(entry.event) &&
+      (entry.tool === undefined || isText(entry.tool)) &&
+      (entry.args === undefined || (isRecord(entry.args) && isJsonValue(entry.args))) &&
+      (entry.approved_by === undefined || isText(entry.approved_by)) &&
+      typeof entry.prev_hash === 'string' &&
+      isText(entry.hash)) &&
+    isRecord(value.chain) &&
+    typeof value.chain.ok === 'boolean' &&
+    isNumber(value.chain.checked) &&
+    (value.chain.first_bad_id === undefined || isNumber(value.chain.first_bad_id))
   );
 }
