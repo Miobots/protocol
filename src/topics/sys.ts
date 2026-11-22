@@ -291,7 +291,11 @@ export function isAuditRequestPayload(value: unknown): value is AuditRequestPayl
   return isRecord(value) && (value.limit === undefined || (isNumber(value.limit) && value.limit > 0));
 }
 
-export type AuditEvent = 'tool_call' | 'killswitch_on' | 'killswitch_off';
+/**
+ * `tool_call` ran; `approval_rejected` / `approval_unanswered` did not (the human said no, or nobody
+ * answered in time — `tool`/`args` say what was asked, `approved_by` who said no).
+ */
+export type AuditEvent = 'tool_call' | 'killswitch_on' | 'killswitch_off' | 'approval_rejected' | 'approval_unanswered';
 
 /** One row of Brain's hash-chained log (B5.4). `hash` covers this row and `prev_hash`. */
 export interface AuditEntry {
@@ -312,7 +316,7 @@ export interface AuditView {
   chain: { ok: boolean; checked: number; first_bad_id?: number };
 }
 
-const AUDIT_EVENTS: readonly string[] = ['tool_call', 'killswitch_on', 'killswitch_off'];
+const AUDIT_EVENTS: readonly string[] = ['tool_call', 'killswitch_on', 'killswitch_off', 'approval_rejected', 'approval_unanswered'];
 
 export function isAuditView(value: unknown): value is AuditView {
   return (
