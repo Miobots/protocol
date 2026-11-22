@@ -7,6 +7,10 @@ Newest entries first. Records wire protocol changes, envelope schema evolution, 
 - `conformance/outbox.json`: one case per `EVT` topic, plus one per other kind, saying whether it waits in a durable outbox. `queuesInOutbox` is tested against it, and so is the Rust gateway, so the robot can never store an event the Brain will not confirm.
 - `sys.devices` and `nav.feedback` no longer queue. The first is the Brain's snapshot of paired laptops, re-sent on every connect; the second is progress, superseded within a second and then by `nav.result`, which does queue. A stored copy of either is only stale, the same as `cap.manifest`. The Fake Heart therefore stops queueing progress, as the gateway never did.
 
+## 2026-11-23 — Refused approvals are audited too (BRAIN_DECISIONS 30)
+
+- `AuditEvent` gains `approval_rejected` and `approval_unanswered`: a laptop action a human said no to, or nobody answered, is a row too, with the tool and arguments that were asked for. No new topic.
+
 ## 2026-11-23 — Audit log and kill switch state (B5.4, B5.6, S5.2)
 
 - `sys.audit` (CMD, Synapse → Brain) asks for the newest rows of Brain's hash-chained log. The ACK carries `audit`: `AuditView` with `entries` (`AuditEntry`: id, time, event, tool, args, `approved_by`, `prev_hash`, `hash`) and `chain` (`ok`, `checked`, `first_bad_id`). `AckPayload` gains optional `audit`. Guards `isAuditRequestPayload` and `isAuditView`.

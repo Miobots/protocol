@@ -22,6 +22,7 @@ describe('sys.audit (B5.4, S5.2)', () => {
     assert.ok(!isAuditView({ entries: [{ ...row, event: 'deleted' }], chain: { ok: true, checked: 1 } }));
     assert.ok(!isAuditView({ entries: [{ ...row, hash: '' }], chain: { ok: true, checked: 1 } }));
     assert.ok(!isAuditView({ entries: [row] }));
+    assert.ok(isAuditView({ entries: [{ ...row, event: 'approval_rejected' }, { ...row, id: 2, event: 'approval_unanswered', approved_by: undefined }], chain: { ok: true, checked: 2 } }));
   });
 
   it('lets sys.devices carry the kill switch state', () => {
