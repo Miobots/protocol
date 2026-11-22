@@ -29,10 +29,10 @@ describe('Telemetry topics (P2.4)', () => {
 
   it('the map is telemetry too, and periodic or request/response events never queue', () => {
     assert.equal(queuesInOutbox(TopicKind[Topics.MAP_SNAPSHOT], Topics.MAP_SNAPSHOT), false);
-    for (const topic of [Topics.SYS_HEARTBEAT, Topics.CAP_MANIFEST, Topics.MCP_RESPONSE, Topics.MCP_NOTIFICATION]) {
+    for (const topic of [Topics.SYS_HEARTBEAT, Topics.CAP_MANIFEST, Topics.SYS_DEVICES, Topics.NAV_FEEDBACK, Topics.MCP_RESPONSE, Topics.MCP_NOTIFICATION]) {
       assert.equal(queuesInOutbox(Kind.EVT, topic), false, topic);
     }
-    for (const topic of [Topics.SCHED_FIRED, Topics.OBS_SIGHTING, Topics.DIAG_FAULT, Topics.NAV_FEEDBACK]) {
+    for (const topic of [Topics.SCHED_FIRED, Topics.OBS_SIGHTING, Topics.DIAG_FAULT, Topics.NAV_RESULT]) {
       assert.equal(queuesInOutbox(TopicKind[topic], topic), true, topic);
     }
   });

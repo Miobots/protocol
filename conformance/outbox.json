@@ -1,0 +1,17 @@
+[
+  { "kind": "EVT", "topic": "nav.result", "queues": true, "description": "A goal ended: a fact, it waits" },
+  { "kind": "EVT", "topic": "nav.feedback", "queues": false, "description": "Progress describes now; the result is what waits" },
+  { "kind": "EVT", "topic": "diag.fault", "queues": true, "description": "A fault happened: a fact, it waits" },
+  { "kind": "EVT", "topic": "sched.fired", "queues": true, "description": "A reminder fired: a fact, it waits" },
+  { "kind": "EVT", "topic": "obs.sighting", "queues": true, "description": "Something was seen: a fact, it waits" },
+  { "kind": "EVT", "topic": "sys.heartbeat", "queues": false, "description": "Re-sent every 5 s; a stored one is only stale" },
+  { "kind": "EVT", "topic": "cap.manifest", "queues": false, "description": "Re-published on a timer and on every connect" },
+  { "kind": "EVT", "topic": "sys.devices", "queues": false, "description": "A snapshot re-sent on every connect" },
+  { "kind": "EVT", "topic": "mcp.response", "queues": false, "description": "Answers a request that has long since timed out" },
+  { "kind": "EVT", "topic": "mcp.notification", "queues": false, "description": "Belongs to an MCP session that is gone after an outage" },
+  { "kind": "TELEM", "topic": "state.pose", "queues": false, "description": "A reading: dropped, never queued" },
+  { "kind": "TELEM", "topic": "map.snapshot", "queues": false, "description": "A reading: dropped, never queued" },
+  { "kind": "CMD", "topic": "nav.goto", "queues": false, "description": "Commands are not queued; the sender is told it failed" },
+  { "kind": "ACK", "topic": "sys.receipt", "queues": false, "description": "An ACK answers now or not at all" },
+  { "kind": "ERR", "topic": "sys.error", "queues": false, "description": "An error answers now or not at all" }
+]

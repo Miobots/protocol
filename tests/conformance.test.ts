@@ -4,6 +4,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  Kind,
+  TopicKind,
+  queuesInOutbox,
   parse,
   decode,
   validateEnvelope,
@@ -119,6 +122,30 @@ describe('Protocol Conformance Vectors (Cross-Language Parity)', () => {
           }
         );
       });
+    }
+  });
+});
+
+interface OutboxVector {
+  kind: Kind;
+  topic: string;
+  queues: boolean;
+  description: string;
+}
+
+describe('Outbox vectors (conformance/outbox.json)', () => {
+  const vectors: OutboxVector[] = JSON.parse(readFileSync(join(CONFORMANCE_DIR, 'outbox.json'), 'utf-8'));
+
+  it('queuesInOutbox agrees with every vector, as the Rust gateway must', () => {
+    for (const v of vectors) {
+      assert.equal(queuesInOutbox(v.kind, v.topic), v.queues, `${v.kind} ${v.topic}: ${v.description}`);
+    }
+  });
+
+  it('names every EVT topic, so a new event cannot skip deciding whether it waits', () => {
+    const covered = new Set(vectors.filter((v) => v.kind === Kind.EVT).map((v) => v.topic));
+    for (const [topic, kind] of Object.entries(TopicKind)) {
+      if (kind === Kind.EVT) assert.ok(covered.has(topic), `${topic} is an EVT with no outbox vector`);
     }
   });
 });
