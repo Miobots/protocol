@@ -4,6 +4,7 @@
  */
 
 import { Kind, ProtocolErrorCode, ProtocolErrorReason, type ExecutionStatus } from '../constants/index.ts';
+import type { AuditView } from '../topics/sys.ts';
 
 export { Kind };
 
@@ -65,6 +66,9 @@ export interface AckPayload {
 
   /** The paired device's display name, on the ACK to `sys.pair_confirm`. */
   name?: string;
+
+  /** The log and its verification, on the ACK to `sys.audit` (S5.2). */
+  audit?: AuditView;
 
   /** Additional structured diagnostic details. */
   details?: Record<string, unknown>;

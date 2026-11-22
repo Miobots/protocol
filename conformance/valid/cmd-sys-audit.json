@@ -1,0 +1,19 @@
+{
+  "description": "Valid sys.audit: the app asks for the newest rows of the tamper-evident log",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7A1",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7A1",
+    "t_mono_ns": "250000000",
+    "t_wall_ms": 1786412540000,
+    "kind": "CMD",
+    "topic": "sys.audit",
+    "seq": 10,
+    "idem_key": "audit-synapse-app-1",
+    "payload": {
+      "limit": 50
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}

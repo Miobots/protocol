@@ -1,0 +1,45 @@
+{
+  "description": "Valid ACK to sys.audit: rows with approver and hashes, and the chain's verification",
+  "envelope": {
+    "msg_id": "01J6G7M8N9P0Q1R2S3T4U5V7A2",
+    "corr_id": "01J6G7M8N9P0Q1R2S3T4U5V7A1",
+    "t_mono_ns": "251000000",
+    "t_wall_ms": 1786412540100,
+    "kind": "ACK",
+    "topic": "sys.audit",
+    "seq": 11,
+    "payload": {
+      "accepted": true,
+      "audit": {
+        "entries": [
+          {
+            "id": 1,
+            "at_ms": 1786412500000,
+            "event": "tool_call",
+            "tool": "open_app_or_url",
+            "args": {
+              "target": "calculator"
+            },
+            "approved_by": "synapse-app",
+            "prev_hash": "",
+            "hash": "a91f0c3e5b7d9f1a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b1d3f5a7c9e1b3d5f7a"
+          },
+          {
+            "id": 2,
+            "at_ms": 1786412520000,
+            "event": "killswitch_on",
+            "prev_hash": "a91f0c3e5b7d9f1a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b1d3f5a7c9e1b3d5f7a",
+            "hash": "77c3e1b5d9f3a7c1e5b9d3f7a1c5e9b3d7f1a5c9e3b7d1f5a9c3e7b1d5f9a3c7"
+          }
+        ],
+        "chain": {
+          "ok": true,
+          "checked": 2
+        }
+      }
+    }
+  },
+  "expect": {
+    "parses": true
+  }
+}
