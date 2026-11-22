@@ -2,6 +2,11 @@
 
 Newest entries first. Records wire protocol changes, envelope schema evolution, and Fake Heart updates.
 
+## 2026-11-23 — Which messages wait in an outbox, as a shared vector (H3.2)
+
+- `conformance/outbox.json`: one case per `EVT` topic, plus one per other kind, saying whether it waits in a durable outbox. `queuesInOutbox` is tested against it, and so is the Rust gateway, so the robot can never store an event the Brain will not confirm.
+- `sys.devices` and `nav.feedback` no longer queue. The first is the Brain's snapshot of paired laptops, re-sent on every connect; the second is progress, superseded within a second and then by `nav.result`, which does queue. A stored copy of either is only stale, the same as `cap.manifest`. The Fake Heart therefore stops queueing progress, as the gateway never did.
+
 ## 2026-11-18 — Push token for approval notifications (BRAIN_DECISIONS 28)
 
 - `sys.push_token` (CMD, Synapse → Brain): the app's Expo push token, or `""` to unregister. With it, Brain can tell a phone whose app is closed that an approval is waiting. The push carries no arguments. `isPushTokenPayload` accepts only `ExponentPushToken[…]` / `ExpoPushToken[…]`, so the Brain can never be pointed at an arbitrary URL.

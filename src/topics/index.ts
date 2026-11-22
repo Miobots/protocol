@@ -178,13 +178,17 @@ export const PayloadGuards: Partial<Record<TopicName, (payload: unknown) => bool
 };
 
 /**
- * EVT topics that never wait in an outbox. Heartbeats and the manifest are re-published on a
- * timer, and an MCP reply answers a request that has long since timed out — a stored copy of any
- * of them is only ever stale.
+ * EVT topics that never wait in an outbox. Heartbeats, the manifest and the paired-device list are
+ * re-sent on a timer or on every connect, progress is superseded within a second and then by the
+ * result, and an MCP reply answers a request that has long since timed out — a stored copy of any
+ * of them is only ever stale. `conformance/outbox.json` holds the
+ * same rule for the Rust gateway.
  */
 const NEVER_QUEUED: ReadonlySet<string> = new Set<TopicName>([
   'sys.heartbeat',
   'cap.manifest',
+  'sys.devices',
+  'nav.feedback',
   'mcp.response',
   'mcp.notification',
 ]);
